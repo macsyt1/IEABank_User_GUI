@@ -823,8 +823,11 @@ item_card <- function(item) {
       div(
         class = "d-flex justify-content-between align-items-start gap-3",
         div(
-          h5(item$item_code),
-          p(class = "item-wording", item$wording)
+          h5(item$item_admin_id),
+          p(class = "item-wording", item$wording),
+          p(class = "small", paste("Scale:", ifelse(item$scale == "", 
+                                                           "Not assigned", 
+                                                           item$scale)))
         ),
         actionButton(
           inputId = paste0("add_item_", item_uid_safe),
@@ -832,50 +835,50 @@ item_card <- function(item) {
           class = "btn btn-sm btn-primary"
         )
       ),
-      tags$hr(),
-      div(
-        class = "text-muted small",
-        paste(
-          ifelse(item$study == "", "Study not available", item$study),
-          ifelse(item$year == "", "", item$year),
-          "·",
-          ifelse(item$population == "", "Target not available", item$population),
-          "·",
-          ifelse(item$instrument == "", "Instrument not available", item$instrument)
-        )
-      ),
-      div(
-        class = "small",
-        paste(
-          "Variable:",
-          ifelse(item$source_variable == "", "Not available", item$source_variable)
-        )
-      ),
-      div(
-        class = "small",
-        paste(
-          "Scale:",
-          ifelse(item$scale == "", "Not assigned", item$scale)
-        )
-      ),
-      div(
-        class = "small",
-        paste(
-          "Type:",
-          ifelse(item$item_type == "", "Not available", item$item_type)
-        )
-      ),
-      div(
-        class = "mt-2",
-        span(
-          class = "badge rounded-pill text-bg-light",
-          ifelse(isTRUE(item$puf), "Public data", "PUF not specified")
-        ),
-        span(
-          class = "badge rounded-pill text-bg-light",
-          item$trend_status
-        )
-      ),
+      # tags$hr(),
+      # div(
+      #   class = "text-muted small",
+      #   paste(
+      #     ifelse(item$study == "", "Study not available", item$study),
+      #     ifelse(item$year == "", "", item$year),
+      #     "·",
+      #     ifelse(item$population == "", "Target not available", item$population),
+      #     "·",
+      #     ifelse(item$instrument == "", "Instrument not available", item$instrument)
+      #   )
+      # ),
+      # div(
+      #   class = "small",
+      #   paste(
+      #     "Variable:",
+      #     ifelse(item$source_variable == "", "Not available", item$source_variable)
+      #   )
+      # ),
+      # div(
+      #   class = "small",
+      #   paste(
+      #     "Scale:",
+      #     ifelse(item$scale == "", "Not assigned", item$scale)
+      #   )
+      # ),
+      # div(
+      #   class = "small",
+      #   paste(
+      #     "Type:",
+      #     ifelse(item$item_type == "", "Not available", item$item_type)
+      #   )
+      # ),
+      # div(
+      #   class = "mt-2",
+      #   span(
+      #     class = "badge rounded-pill text-bg-light",
+      #     ifelse(isTRUE(item$puf), "Public data", "PUF not specified")
+      #   ),
+      #   span(
+      #     class = "badge rounded-pill text-bg-light",
+      #     item$trend_status
+      #   )
+      # ),
       actionButton(
         inputId = paste0("details_item_", item_uid_safe),
         label = "Details →",
@@ -1862,7 +1865,7 @@ server <- function(input, output, session) {
     
     showModal(
       modalDialog(
-        title = paste("Item details:", item$item_code),
+        title = paste("Item details:", item$item_admin_id),
         size = "xl",
         easyClose = TRUE,
         footer = tagList(
@@ -1901,11 +1904,11 @@ server <- function(input, output, session) {
               class = "detail-section",
               h5("Item metadata"),
               p(strong("Item UID: "), item$item_uid),
-              p(strong("Item code: "), item$item_code),
+              p(strong("Item version: "), item$item_code),
               p(strong("Source variable: "), item$source_variable),
-              p(strong("Dataset label: "), item$dataset_label),
-              p(strong("Item type: "), item$item_type),
-              p(strong("PUF: "), as.character(item$puf)),
+              # p(strong("Dataset label: "), item$dataset_label),
+              # p(strong("Item type: "), item$item_type),
+              # p(strong("PUF: "), as.character(item$puf)),
               p(strong("Trend status: "), item$trend_status)
             )
           ),
@@ -1934,9 +1937,9 @@ server <- function(input, output, session) {
             class = "detail-section",
             h5("Additional wording fields"),
             p(strong("Question: "), item$wording_question),
-            p(strong("Instruction: "), item$wording_instruction),
-            p(strong("Context: "), item$wording_context),
-            p(strong("Heading: "), item$wording_heading)
+            p(strong("Instruction: "), item$wording_instruction)
+            # p(strong("Context: "), item$wording_context),
+            # p(strong("Heading: "), item$wording_heading)
           ),
           
           div(
