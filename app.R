@@ -153,6 +153,14 @@ login_ui <- function() {
       )
     ),
     
+    tags$script(HTML("
+      $(document).on('keypress', '#login_email, #login_password', function(e) {
+        if (e.which === 13) {
+          $('#login_btn').click();
+        }
+      });
+    ")),
+    
     uiOutput("login_message")
   )
 }
