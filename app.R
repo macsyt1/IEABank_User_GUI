@@ -20,6 +20,7 @@ library(tibble)
 library(stringr)
 library(DT)
 library(openxlsx)
+library(httr2)
 
 # ------------------------------------------------------------
 # App version
@@ -48,8 +49,119 @@ pool <- dbPool(
 onStop(function() poolClose(pool))
 
 # ------------------------------------------------------------
+# Authentication
+# ------------------------------------------------------------
+# The public deploy runs as public_app and needs no login; anything
+# else (internal_app, or a role we do not recognise) does. Deriving
+# it from the credential means a missing variable fails closed.
+
+SUPABASE_URL      <- Sys.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY <- Sys.getenv("SUPABASE_ANON_KEY")
+
+REQUIRE_LOGIN <- !grepl("^public_app", Sys.getenv("SUPABASE_RO_USER"))
+
+supabase_sign_in <- function(email, password) {
+  
+  req <- request(paste0(SUPABASE_URL, "/auth/v1/token?grant_type=password")) |>
+    req_method("POST") |>
+    req_headers(
+      apikey = SUPABASE_ANON_KEY,
+      Authorization = paste("Bearer", SUPABASE_ANON_KEY)
+    ) |>
+    req_body_json(list(email = email, password = password))
+  
+  resp <- tryCatch(req_perform(req), error = function(e) NULL)
+  
+  if (is.null(resp) || resp_status(resp) >= 400) {
+    return(NULL)
+  }
+  
+  resp_body_json(resp)
+}
+
+get_user_profile <- function(user_id) {
+  dbGetQuery(
+    pool,
+    "select user_id, first_name, last_name, role, active
+       from public.user_profiles
+      where user_id = $1",
+    params = list(user_id)
+  )
+}
+
+supabase_send_password_reset <- function(email) {
+  
+  reset_url <- "https://macsyt1.github.io/IEABank_Admin_GUI/reset-password.html"
+  
+  req <- request(paste0(SUPABASE_URL, "/auth/v1/recover")) |>
+    req_url_query(redirect_to = reset_url) |>
+    req_method("POST") |>
+    req_headers(
+      apikey = SUPABASE_ANON_KEY,
+      Authorization = paste("Bearer", SUPABASE_ANON_KEY)
+    ) |>
+    req_body_json(list(email = email))
+  
+  resp <- tryCatch(req_perform(req), error = function(e) NULL)
+  
+  !is.null(resp) && resp_status(resp) < 400
+}
+
+login_ui <- function() {
+  div(
+    style = "
+      max-width: 420px;
+      margin: 90px auto;
+      padding: 32px;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 2px 10px rgba(0,0,0,.08);
+    ",
+    
+    div(
+      style = "text-align:center; margin-bottom:24px;",
+      img(src = "iea_logo.png", style = "height:52px; margin-bottom:14px;"),
+      div(
+        style = "font-size:1.4rem; font-weight:700; color:#54565A;",
+        "IEABank Viewer"
+      )
+    ),
+    
+    textInput(
+      "login_email",
+      "Email",
+      placeholder = "name@example.org"
+    ),
+    
+    passwordInput(
+      "login_password",
+      "Password"
+    ),
+    
+    actionButton(
+      "login_btn",
+      "Sign in",
+      class = "btn-primary w-100"
+    ),
+    
+    div(
+      style = "text-align:center; margin-top:14px;",
+      actionLink(
+        "forgot_password_btn",
+        "Forgot password?"
+      )
+    ),
+    
+    uiOutput("login_message")
+  )
+}
+
+# ------------------------------------------------------------
 # Helpers generales
 # ------------------------------------------------------------
+
+`%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
 
 safe_chr <- function(x) {
   ifelse(is.na(x), "", as.character(x))
@@ -1109,7 +1221,7 @@ questionnaire_card <- function(questionnaire_row) {
 # UI
 # ------------------------------------------------------------
 
-ui <- page_navbar(
+main_ui <- function() page_navbar(
   id = "main_nav",
   title = app_brand,
   theme = app_theme,
@@ -1918,11 +2030,104 @@ ui <- page_navbar(
   )
 )
 
+ui <- page_fluid(
+  theme = app_theme,
+  padding = 0,
+  uiOutput("app_ui")
+)
+
 # ------------------------------------------------------------
 # Server
 # ------------------------------------------------------------
 
 server <- function(input, output, session) {
+  
+  current_user <- reactiveVal(
+    if (REQUIRE_LOGIN) NULL else list(first_name = "", last_name = "", role = "public")
+  )
+  
+  login_error <- reactiveVal(NULL)
+  
+  output$app_ui <- renderUI({
+    if (is.null(current_user())) login_ui() else main_ui()
+  })
+  
+  output$login_message <- renderUI({
+    req(login_error())
+    div(class = "text-danger mt-3", login_error())
+  })
+  
+  observeEvent(input$forgot_password_btn, {
+    showModal(
+      modalDialog(
+        title = "Reset password",
+        p("Enter your email address. If it is registered, you will receive a password recovery link."),
+        textInput("reset_email", "Email"),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton("send_reset_btn", "Send recovery email", class = "btn-primary")
+        ),
+        easyClose = FALSE
+      )
+    )
+  })
+  
+  observeEvent(input$send_reset_btn, {
+    
+    email <- trimws(input$reset_email %||% "")
+    
+    if (!nzchar(email)) {
+      showNotification("Enter your email address.", type = "error")
+      return()
+    }
+    
+    tryCatch(
+      supabase_send_password_reset(email),
+      error = function(e) NULL
+    )
+    
+    removeModal()
+    
+    showNotification(
+      "If this email address is registered, a password recovery link has been sent.",
+      type = "message",
+      duration = 8
+    )
+  })
+  
+  observeEvent(input$login_btn, {
+    
+    login_error(NULL)
+    
+    email <- trimws(input$login_email %||% "")
+    password <- input$login_password %||% ""
+    
+    if (!nzchar(email) || !nzchar(password)) {
+      login_error("Enter your email and password.")
+      return()
+    }
+    
+    auth <- supabase_sign_in(email, password)
+    
+    if (is.null(auth) || is.null(auth$user$id)) {
+      login_error("Invalid email or password.")
+      return()
+    }
+    
+    profile <- get_user_profile(auth$user$id)
+    
+    if (nrow(profile) != 1) {
+      login_error("This account has no IEABank profile.")
+      return()
+    }
+    
+    if (!isTRUE(profile$active[1])) {
+      login_error("This account is inactive. Contact an administrator.")
+      return()
+    }
+    
+    current_user(as.list(profile[1, ]))
+  })
   
   # ----------------------------------------------------------
   # Load data from Supabase
