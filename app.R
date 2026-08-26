@@ -156,7 +156,8 @@ login_ui <- function() {
     tags$script(HTML("
       $(document).on('keypress', '#login_email, #login_password', function(e) {
         if (e.which === 13) {
-          $('#login_btn').click();
+          $(this).trigger('change');
+          setTimeout(function() { $('#login_btn').click(); }, 100);
         }
       });
     ")),
