@@ -2030,11 +2030,15 @@ main_ui <- function() page_navbar(
   )
 )
 
-ui <- page_fluid(
-  theme = app_theme,
-  padding = 0,
-  uiOutput("app_ui")
-)
+ui <- if (REQUIRE_LOGIN) {
+  page_fluid(
+    theme = app_theme,
+    padding = 0,
+    uiOutput("app_ui")
+  )
+} else {
+  main_ui()
+}
 
 # ------------------------------------------------------------
 # Server
