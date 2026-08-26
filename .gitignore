@@ -10,6 +10,7 @@ renv/staging/
 *.sqlite
 *.rds
 *.RDS
+*.xlsx
 
 app_old.R
 app_old_old.R
