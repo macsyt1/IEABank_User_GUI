@@ -361,7 +361,7 @@ get_items <- function(pool) {
                   by = "index_id") %>%
         left_join(tbl(pool, "index"), by = "index_uid") %>%
         select(item_admin_pk, index_uid, index_var, index_name, index_id,
-               index_version_description, index_varname, is_scaled),
+               index_version_description, index_varname, is_scaled, index_puf = is_puf),
       by = "item_admin_pk"
     ) %>%
     collect()
@@ -928,6 +928,12 @@ server <- function(input, output, session) {
     showModal(modalDialog(
       title = paste("Derived variable details:", scale_row$scale_name), size = "xl", easyClose = TRUE, footer = modalButton("Close"),
       div(class = "detail-modal",
+          if (any(all_items$scale_uid == scale_row$scale_uid &
+                  !is.na(all_items$index_puf) & !all_items$index_puf)) {
+            div(class = "alert alert-warning",
+                "Attention: For data protection reasons, this derived variable has been left out from the public use data. Researchers interested in using these additional variables for analysis can apply to get the restricted use data. More information in: ",
+                tags$a(href = "https://www.iea.nl/data-tools/repository/", target = "_blank", "IEA Data Repository"))
+          },
           div(class = "detail-section", h5(scale_row$scale_name),
               p(class = "text-muted", paste(scale_row$scale_uid, "·", scale_row$n_versions, "versions ·", scale_row$n_items, "items"))),
           div(class = "detail-section", h5("Versions"), DTOutput("scale_versions_table")),
