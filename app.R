@@ -880,7 +880,10 @@ server <- function(input, output, session) {
     if (nrow(df) == 0) return(df)
     selected_scales <- input$questionnaire_scale_filter
     if (!is.null(selected_scales) && length(selected_scales) > 0) df <- df %>% filter(scale %in% selected_scales)
-    df
+    df %>% group_by(item_admin_pk) %>%
+      summarise(across(-c(scale, scale_varname, scale_uid, scale_id, index_puf, is_scaled), first),
+                derived_variables = paste(sort(unique(scale[!is.na(scale) & nzchar(scale)])), collapse = "; "),
+                .groups = "drop")
   })
   modal_category_id <- reactiveVal("")
   modal_category_items <- reactive(derive_category_items(modal_category_id(), items_data()))
@@ -981,21 +984,21 @@ server <- function(input, output, session) {
     questionnaire_items <- all_items %>%
       filter(study == questionnaire_row$study, year == questionnaire_row$year, cycle == questionnaire_row$cycle,
              population == questionnaire_row$population, instrument == questionnaire_row$instrument) %>%
-      distinct(item_uid, .keep_all = TRUE) %>% arrange(section, scale, item_uid)
+      arrange(item_uid, item_admin_pk)
     modal_questionnaire_items(questionnaire_items)
     scale_choices <- questionnaire_items %>% filter(!is.na(scale), scale != "") %>% distinct(scale) %>% arrange(scale) %>% pull(scale)
     showModal(modalDialog(
-      title = paste("Questionnaire details:", questionnaire_row$study, questionnaire_row$year, questionnaire_row$population, questionnaire_row$instrument),
+      title = paste("Questionnaire details:", questionnaire_row$study, questionnaire_row$year, questionnaire_row$instrument),
       size = "xl", easyClose = TRUE, footer = modalButton("Close"),
       div(class = "detail-modal",
           layout_columns(col_widths = c(6, 6),
                          div(class = "detail-section", h5("Questionnaire"), p(strong("Study: "), questionnaire_row$study), p(strong("Year: "), questionnaire_row$year), p(strong("Cycle: "), questionnaire_row$cycle)),
-                         div(class = "detail-section", h5("Instrument"), p(strong("Target: "), questionnaire_row$target), p(strong("Instrument: "), questionnaire_row$instrument), p(strong("Items: "), questionnaire_row$n_items), p(strong("Scales: "), questionnaire_row$n_scales))),
+                         div(class = "detail-section", h5("Instrument"), p(strong("Target: "), questionnaire_row$target), p(strong("Instrument: "), questionnaire_row$instrument), p(strong("Items: "), questionnaire_row$n_items), p(strong("Derived variables: "), questionnaire_row$n_scales))),
           div(class = "detail-section", h5("Items in this questionnaire"),
-              p(class = "text-muted", "Filter by one or more scales, select rows to add specific items, or add the complete questionnaire."),
+              p(class = "text-muted", "Filter by one or more derived variables, select rows to add specific items, or add the complete questionnaire."),
               actionButton("modal_add_questionnaire_all", "Add complete questionnaire", class = "btn btn-primary btn-modal-action"),
               actionButton("modal_add_questionnaire_selected", "Add selected items", class = "btn btn-outline-primary btn-modal-action"),
-              selectizeInput("questionnaire_scale_filter", "Filter by scale", choices = scale_choices, selected = NULL, multiple = TRUE,
+              selectizeInput("questionnaire_scale_filter", "Filter by derived variable", choices = scale_choices, selected = NULL, multiple = TRUE,
                              options = list(placeholder = "Select one or more scales; leave empty to show all items")),
               DTOutput("questionnaire_items_table")))
     ))
@@ -1052,7 +1055,16 @@ server <- function(input, output, session) {
   output$questionnaire_items_table <- renderDT({
     df <- modal_questionnaire_filtered_items()
     if (nrow(df) == 0) return(datatable_simple(tibble(message = "No items available for the selected scale filter.")))
-    df %>% select(section, scale, scale_varname, item_uid, item_code, source_variable, wording, item_type, trend_status, puf) %>% datatable_all_items(selection = "multiple")
+    df %>%
+      transmute(`Item UID` = item_uid,
+                `Item name` = item_name,
+                `Version` = item_id,
+                `Variable` = source_variable,
+                `Wording` = wording,
+                `Response type` = item_type,
+                `Derived variables` = derived_variables,
+                `PUF` = puf) %>%
+      datatable_all_items(selection = "multiple")
   })
 
   # Modal add buttons
