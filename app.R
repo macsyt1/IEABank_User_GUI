@@ -171,7 +171,7 @@ example_link <- function(path, label) {
 datatable_variants <- function(df) {
   datatable(
     df, rownames = FALSE, escape = FALSE, selection = "none",
-    colnames = c("Version", "Study", "Year", "Population", "Variable", "Scale(s)", "Example"),
+    colnames = c("Version", "Study", "Year", "Population", "Variable", "Index(es)", "Example"),
     options = list(paging = FALSE, dom = "t", scrollX = TRUE, ordering = FALSE)
   )
 }
