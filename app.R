@@ -403,7 +403,16 @@ get_response_options <- function(pool, selected_items) {
   response_values <- read_table_safe(pool, "response_scheme_values")
   if (nrow(response_values) == 0) return(tibble())
   if (!"response_id" %in% names(response_values)) return(response_values)
-  response_values %>% filter(response_id %in% selected_response_ids)
+  response_values %>% filter(response_id %in% selected_response_ids) %>%
+    mutate(
+      value = response_value,
+      label = if_else(
+        !is.na(checked_value) & !is.na(not_checked_value),
+        paste0(coalesce(response_label, ""), " (", checked_value,
+               " = Checked; ", not_checked_value, " = Not checked)"),
+        coalesce(response_label, "")
+      )
+    )
 }
 
 get_missing_values <- function(pool, selected_items) {
@@ -412,7 +421,8 @@ get_missing_values <- function(pool, selected_items) {
   miss_values <- read_table_safe(pool, "miss_scheme_values")
   if (nrow(miss_values) == 0) return(tibble())
   if (!"miss_id" %in% names(miss_values)) return(miss_values)
-  miss_values %>% filter(miss_id %in% selected_miss_ids)
+  miss_values %>% filter(miss_id %in% selected_miss_ids) %>%
+    mutate(value = miss_value, category = miss_description)
 }
 
 get_variables_and_data <- function(pool, selected_items) {
@@ -1060,7 +1070,8 @@ server <- function(input, output, session) {
         grepl(q, tolower(item_code), fixed = TRUE) | grepl(q, tolower(item_uid), fixed = TRUE) |
           grepl(q, tolower(item_name), fixed = TRUE) | grepl(q, tolower(category_id), fixed = TRUE) |
           grepl(q, tolower(category_name), fixed = TRUE) | grepl(q, tolower(wording), fixed = TRUE) |
-          grepl(q, tolower(source_variable), fixed = TRUE) | grepl(q, tolower(scale), fixed = TRUE) |
+          grepl(q, tolower(item_code), fixed = TRUE) | grepl(q, tolower(item_admin_id), fixed = TRUE) |
+           grepl(q, tolower(source_variable), fixed = TRUE) | grepl(q, tolower(scale), fixed = TRUE) |
           grepl(q, tolower(scale_varname), fixed = TRUE) | grepl(q, tolower(section), fixed = TRUE) |
           grepl(q, tolower(dataset_label), fixed = TRUE))
     }
