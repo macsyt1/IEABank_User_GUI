@@ -25,7 +25,7 @@ library(httr2)
 # ------------------------------------------------------------
 # App version
 # ------------------------------------------------------------
-APP_VERSION <- "0.3.1"
+APP_VERSION <- "0.3.2"
 
 # ------------------------------------------------------------
 # Institutional colors
@@ -338,43 +338,39 @@ standardize_items <- function(df) {
 # ------------------------------------------------------------
 
 get_items <- function(pool) {
-  # Adapt the new October 2026 database contract to the Explorer's display model.
-  # Keep one row per index membership, so a single item may appear in multiple indices.
-  items <- tbl(pool, "item_admin") %>%
-    filter(is_public_itembank == TRUE) %>%
-    left_join(
-      tbl(pool, "admin") %>% select(admin_id, study, phase, year, instrument_name,
-                                   instrument_pop, target_grade, cycle_num),
-      by = "admin_id"
-    ) %>%
-    left_join(
-      tbl(pool, "item") %>% select(item_uid, item_name, topic_id),
-      by = "item_uid"
-    ) %>%
-    left_join(
-      tbl(pool, "topic") %>% select(topic_id, category_name),
-      by = "topic_id"
-    ) %>%
-    left_join(
-      tbl(pool, "index_item") %>%
-        left_join(tbl(pool, "index_version") %>% filter(is_public_itembank == TRUE),
-                  by = "index_id") %>%
-        left_join(tbl(pool, "index"), by = "index_uid") %>%
-        select(item_admin_pk, index_uid, index_var, index_name, index_id,
-               index_version_description, index_varname, is_scaled, index_puf = is_puf),
-      by = "item_admin_pk"
-    ) %>%
-    collect()
+  # Explicit SQL avoids implicit dbplyr SELECT * projection and legacy
+  # aliases after the October 2026 schema migration.
+  sql <- "
+    SELECT ia.*,
+           a.study, a.phase, a.year, a.instrument_name AS instrument,
+           a.instrument_pop AS population, a.target_grade AS target,
+           a.cycle_num AS cycle,
+           it.item_name, it.topic_id AS category_id, tp.category_name,
+           ix.index_id AS scale_id, iv.index_uid AS scale_uid,
+           iv.index_var AS scale_var, iv.index_varname AS scale_varname,
+           iv.index_version_description AS scale_description,
+           ixmeta.index_name AS scale_name, ixmeta.is_scaled,
+           iv.is_puf AS index_puf
+    FROM public.item_admin AS ia
+    LEFT JOIN public.admin AS a ON a.admin_id = ia.admin_id
+    LEFT JOIN public.item AS it ON it.item_uid = ia.item_uid
+    LEFT JOIN public.topic AS tp ON tp.topic_id = it.topic_id
+    LEFT JOIN (
+      SELECT ii.item_admin_pk, ii.index_id
+      FROM public.index_item AS ii
+      JOIN public.index_version AS iv0
+        ON iv0.index_id = ii.index_id AND iv0.is_public_itembank = TRUE
+    ) AS ix ON ix.item_admin_pk = ia.item_admin_pk
+    LEFT JOIN public.index_version AS iv ON iv.index_id = ix.index_id
+    LEFT JOIN public.\"index\" AS ixmeta ON ixmeta.index_uid = iv.index_uid
+    WHERE ia.is_public_itembank = TRUE
+  "
+  items <- DBI::dbGetQuery(pool, sql)
   if (nrow(items) == 0) return(items)
   items <- items %>%
     mutate(
       item_admin_id = item_id,
-      category_id = topic_id,
-      scale_id = index_id, scale_uid = index_uid,
-      scale_var = index_var, scale_name = index_name,
-      scale_varname = index_varname, scale_description = index_version_description,
-      instrument = instrument_name, population = instrument_pop,
-      target = target_grade, cycle = cycle_num,
+      scale = scale_description,
       type = response_type, puf = is_puf,
       wording_item = coalesce(wording_item, wording_question),
       wording_question = if_else(
