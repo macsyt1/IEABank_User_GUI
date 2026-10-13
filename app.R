@@ -393,7 +393,9 @@ get_item_examples <- function(pool) read_table_safe(pool, "item_example")
 get_scale_membership <- function(pool, selected_items) {
   df <- read_table_safe(pool, "index_item")
   if (nrow(df) == 0) return(tibble())
-  df %>% left_join(read_table_safe(pool, "index_version"), by = "scale_id") %>%
+  df %>% left_join(read_table_safe(pool, "index_version"), by = "index_id") %>%
+    mutate(scale_id = index_id, scale_uid = index_uid, scale_var = index_var,
+           scale_varname = index_varname, scale_description = index_version_description) %>%
     filter(item_admin_pk %in% selected_items$item_admin_pk)
 }
 
