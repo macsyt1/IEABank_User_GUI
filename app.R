@@ -229,7 +229,7 @@ grid_details_button <- function(item_uid) {
 datatable_items_grid <- function(df) {
   datatable(
     df, rownames = FALSE, escape = FALSE, selection = "multiple",
-    colnames = c("Item UID", "Item", "Category", "Studies", "Years", "Versions", ""),
+    colnames = c("Item UID", "Item", "Topic", "Studies", "Years", "Versions", ""),
     options = list(
       dom = "lrtip", pageLength = 25, lengthMenu = c(10, 25, 50, 100),
       scrollX = TRUE, autoWidth = FALSE,
@@ -245,7 +245,7 @@ datatable_items_grid <- function(df) {
 datatable_scales_grid <- function(df) {
   datatable(
     df, rownames = FALSE, escape = FALSE, selection = "multiple",
-    colnames = c("Scale UID", "Scale", "Variables", "Studies", "Years", "Items", "Versions", ""),
+    colnames = c("Index UID", "Index", "Variables", "Studies", "Years", "Items", "Versions", ""),
     options = list(
       dom = "lrtip", pageLength = 25, lengthMenu = c(10, 25, 50, 100),
       scrollX = TRUE, autoWidth = FALSE,
@@ -261,7 +261,7 @@ datatable_scales_grid <- function(df) {
 datatable_categories_grid <- function(df) {
   datatable(
     df, rownames = FALSE, escape = FALSE, selection = "multiple",
-    colnames = c("Category ID", "Category", "Studies", "Years", "Items", ""),
+    colnames = c("Topic ID", "Topic", "Studies", "Years", "Items", ""),
     options = list(
       dom = "lrtip", pageLength = 25, lengthMenu = c(10, 25, 50, 100),
       scrollX = TRUE, autoWidth = FALSE,
