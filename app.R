@@ -277,7 +277,7 @@ datatable_categories_grid <- function(df) {
 datatable_questionnaires_grid <- function(df) {
   datatable(
     df, rownames = FALSE, escape = FALSE, selection = "multiple",
-    colnames = c("Study", "Year", "Cycle", "Target", "Instrument", "Items", "Sections", "Scales", ""),
+    colnames = c("Study", "Year", "Cycle", "Target", "Instrument", "Items", "Sections", "Derived Variables", ""),
     options = list(
       dom = "lrtip", pageLength = 25, lengthMenu = c(10, 25, 50, 100),
       scrollX = TRUE, autoWidth = FALSE,
@@ -636,21 +636,21 @@ main_ui <- function() page_navbar(
     "Home",
     div(
       class = "home-hero",
-      h1("Explore questionnaire items across studies, cycles and scales"),
+      h1("Explore questionnaire items across studies and cycles"),
       p(class = "lead text-muted", "Search, compare and export item metadata from IEA studies."),
       div(
         class = "mt-3",
         actionButton("go_items", "Explore items", class = "btn btn-primary"),
-        actionButton("go_scales", "Browse scales", class = "btn btn-outline-primary"),
-        actionButton("go_categories", "Browse categories", class = "btn btn-outline-primary"),
-        actionButton("go_questionnaires", "Browse questionnaires", class = "btn btn-outline-primary")
+        actionButton("go_scales", "Browse derived variables", class = "btn btn-outline-primary"),
+        actionButton("go_categories", "Browse topics", class = "btn btn-outline-primary"),
+        actionButton("go_questionnaires", "Browse instruments", class = "btn btn-outline-primary")
       )
     ),
     layout_columns(
       col_widths = c(4, 4, 4),
       card(class = "home-card", card_body(h4("Items"), p("Search individual items, wording, response options and metadata."), span(class = "badge rounded-pill text-bg-light", "Item-level"))),
-      card(class = "home-card", card_body(h4("Scales"), p("Browse constructs and groups of items across cycles."), span(class = "badge rounded-pill text-bg-light", "Scale-level"))),
-      card(class = "home-card", card_body(h4("Questionnaires"), p("Explore complete instruments, sections and questionnaire structures."), span(class = "badge rounded-pill text-bg-light", "Instrument-level")))
+      card(class = "home-card", card_body(h4("Derived Variables"), p("Browse constructs and groups of items across cycles."), span(class = "badge rounded-pill text-bg-light", "Derived-variable level"))),
+      card(class = "home-card", card_body(h4("Instruments"), p("Explore complete instruments, sections and questionnaire structures."), span(class = "badge rounded-pill text-bg-light", "Instrument-level")))
     )
   ),
 
@@ -668,7 +668,7 @@ main_ui <- function() page_navbar(
       ),
       div(
         uiOutput("items_count"),
-        textInput("search_items", NULL, placeholder = "Search within items, wording, variable, category, scale or section..."),
+        textInput("search_items", NULL, placeholder = "Search within item IDs, wording, variable, topic, derived variable or section..."),
         div(class = "mb-2", actionButton("grid_add_items", "+ Add selected", class = "btn btn-sm btn-primary")),
         DTOutput("items_table")
       )
@@ -676,8 +676,8 @@ main_ui <- function() page_navbar(
   ),
 
   nav_panel(
-    "Scales",
-    page_header("Explore Scales", "Browse constructs and item groups across studies and cycles."),
+    "Derived Variables",
+    page_header("Explore Derived Variables", "Browse derived variables and their item composition across studies and cycles."),
     layout_columns(
       col_widths = c(3, 9),
       div(
@@ -688,7 +688,7 @@ main_ui <- function() page_navbar(
       ),
       div(
         uiOutput("scales_count"),
-        textInput("search_scales", NULL, placeholder = "Search within scales, scale variables, study, cycle, target or instrument..."),
+        textInput("search_scales", NULL, placeholder = "Search within derived variables, study, year, target or instrument..."),
         div(class = "mb-2", actionButton("grid_add_scales", "+ Add selected", class = "btn btn-sm btn-primary")),
         DTOutput("scales_table")
       )
@@ -696,8 +696,8 @@ main_ui <- function() page_navbar(
   ),
 
   nav_panel(
-    "Categories",
-    page_header("Categories", "Browse the constructs items belong to, independently of administration."),
+    "Topics",
+    page_header("Topics", "Browse item topics independently of administration."),
     layout_columns(
       col_widths = c(3, 9),
       div(
@@ -708,7 +708,7 @@ main_ui <- function() page_navbar(
       ),
       div(
         uiOutput("categories_count"),
-        textInput("search_categories", NULL, placeholder = "Search within categories..."),
+        textInput("search_categories", NULL, placeholder = "Search within topics..."),
         div(class = "mb-2", actionButton("grid_add_categories", "+ Add selected", class = "btn btn-sm btn-primary")),
         DTOutput("categories_table")
       )
@@ -716,8 +716,8 @@ main_ui <- function() page_navbar(
   ),
 
   nav_panel(
-    "Questionnaires",
-    page_header("Explore Questionnaires", "Browse complete questionnaires and instruments."),
+    "Instruments",
+    page_header("Explore Instruments", "Browse available instruments and questionnaires."),
     layout_columns(
       col_widths = c(3, 9),
       div(
@@ -736,8 +736,8 @@ main_ui <- function() page_navbar(
   ),
 
   nav_panel(
-    "Selection Cart",
-    page_header("Selection Cart", "Review selected unique items and export structured metadata."),
+    "Export Selection",
+    page_header("Export Selection", "Review selected unique items and export structured metadata."),
     div(
       class = "cart-summary", uiOutput("cart_summary"),
       div(class = "mt-2",
@@ -1000,9 +1000,9 @@ server <- function(input, output, session) {
 
   # Home navigation
   observeEvent(input$go_items, nav_select("main_nav", "Items"))
-  observeEvent(input$go_scales, nav_select("main_nav", "Scales"))
-  observeEvent(input$go_categories, nav_select("main_nav", "Categories"))
-  observeEvent(input$go_questionnaires, nav_select("main_nav", "Questionnaires"))
+  observeEvent(input$go_scales, nav_select("main_nav", "Derived Variables"))
+  observeEvent(input$go_categories, nav_select("main_nav", "Topics"))
+  observeEvent(input$go_questionnaires, nav_select("main_nav", "Instruments"))
 
   # Item filters
   output$filter_study_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$study))); selectInput("filter_study_items", "Study", choices = c("All", choices)) })
