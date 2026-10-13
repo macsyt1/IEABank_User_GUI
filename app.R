@@ -444,6 +444,7 @@ derive_scales <- function(items) {
       studies = paste(sort(unique(study[study != ""])), collapse = ", "),
       years = paste(sort(unique(year[year != ""])), collapse = ", "),
       n_versions = n_distinct(scale_id),
+      is_scaled = any(is_scaled %in% TRUE),
       n_items = n_distinct(item_uid), .groups = "drop"
     ) %>% arrange(scale_uid)
 }
@@ -451,7 +452,7 @@ derive_scales <- function(items) {
 derive_scale_admins <- function(items) {
   if (nrow(items) == 0) return(tibble())
   items %>% filter(scale_uid != "") %>%
-    distinct(scale_uid, scale_id, scale_var, scale_varname, scale, admin_id, study, phase, year, cycle, population, instrument) %>%
+    distinct(scale_uid, scale_id, scale_var, scale_varname, scale, admin_id, study, phase, year, cycle, population, instrument, target) %>%
     arrange(scale_uid, year, scale_var)
 }
 
@@ -486,7 +487,7 @@ derive_categories <- function(items) {
 derive_category_admins <- function(items) {
   if (nrow(items) == 0) return(tibble())
   items %>% filter(category_id != "") %>%
-    distinct(category_id, admin_id, study, phase, year, cycle, population, instrument)
+    distinct(category_id, admin_id, study, phase, year, cycle, population, instrument, target)
 }
 
 derive_category_items <- function(cat_id, items) {
@@ -703,7 +704,7 @@ main_ui <- function() page_navbar(
       col_widths = c(3, 9),
       div(
         class = "filter-panel", h5("Filters"),
-        uiOutput("filter_study_items_ui"), uiOutput("filter_year_items_ui"), uiOutput("filter_population_items_ui"), uiOutput("filter_instrument_items_ui"), uiOutput("filter_scale_items_ui"),
+        uiOutput("filter_study_items_ui"), uiOutput("filter_year_items_ui"), uiOutput("filter_population_items_ui"), uiOutput("filter_target_items_ui"), uiOutput("filter_instrument_items_ui"), uiOutput("filter_scale_items_ui"),
         uiOutput("filter_type_items_ui"), uiOutput("filter_puf_items_ui"),
         actionButton("reset_item_filters", "Reset filters", class = "btn btn-outline-secondary btn-sm")
       ),
@@ -723,7 +724,8 @@ main_ui <- function() page_navbar(
       col_widths = c(3, 9),
       div(
         class = "filter-panel", h5("Filters"),
-        uiOutput("filter_study_scales_ui"), uiOutput("filter_year_scales_ui"), uiOutput("filter_population_scales_ui"), uiOutput("filter_instrument_scales_ui"),
+        uiOutput("filter_study_scales_ui"), uiOutput("filter_year_scales_ui"), uiOutput("filter_population_scales_ui"), uiOutput("filter_target_scales_ui"), uiOutput("filter_instrument_scales_ui"),
+        checkboxInput("filter_scaled_only", "Construct scales only", value = FALSE),
         actionButton("reset_scale_filters", "Reset filters", class = "btn btn-outline-secondary btn-sm")
       ),
       div(
@@ -742,7 +744,7 @@ main_ui <- function() page_navbar(
       col_widths = c(3, 9),
       div(
         class = "filter-panel", h5("Filters"),
-        uiOutput("filter_study_categories_ui"), uiOutput("filter_year_categories_ui"), uiOutput("filter_population_categories_ui"), uiOutput("filter_instrument_categories_ui"),
+        uiOutput("filter_study_categories_ui"), uiOutput("filter_year_categories_ui"), uiOutput("filter_population_categories_ui"), uiOutput("filter_target_categories_ui"), uiOutput("filter_instrument_categories_ui"),
         actionButton("reset_category_filters", "Reset filters", class = "btn btn-outline-secondary btn-sm")
       ),
       div(
@@ -1063,7 +1065,8 @@ server <- function(input, output, session) {
   output$filter_study_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$study))); selectInput("filter_study_items", "Study", choices = c("All", choices)) })
   output$filter_year_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$year))); selectInput("filter_year_items", "Year", choices = c("All", choices)) })
   output$filter_cycle_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$cycle))); selectInput("filter_cycle_items", "Cycle", choices = c("All", choices)) })
-  output$filter_population_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$population))); selectInput("filter_population_items", "Target", choices = c("All", choices)) })
+  output$filter_population_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$population))); selectInput("filter_population_items", "Population", choices = c("All", choices)) })
+  output$filter_target_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$target))); selectInput("filter_target_items", "Target grade", choices = c("All", choices)) })
   output$filter_instrument_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$instrument))); selectInput("filter_instrument_items", "Instrument", choices = c("All", choices)) })
   output$filter_scale_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$scale))); selectInput("filter_scale_items", "Scale", choices = c("All", choices)) })
   output$filter_type_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$item_type))); selectInput("filter_type_items", "Item type", choices = c("All", choices)) })
@@ -1075,6 +1078,7 @@ server <- function(input, output, session) {
     if (!is.null(input$filter_year_items) && input$filter_year_items != "All") df <- df %>% filter(year == input$filter_year_items)
     if (!is.null(input$filter_cycle_items) && input$filter_cycle_items != "All") df <- df %>% filter(cycle == input$filter_cycle_items)
     if (!is.null(input$filter_population_items) && input$filter_population_items != "All") df <- df %>% filter(population == input$filter_population_items)
+    if (!is.null(input$filter_target_items) && input$filter_target_items != "All") df <- df %>% filter(target == input$filter_target_items)
     if (!is.null(input$filter_instrument_items) && input$filter_instrument_items != "All") df <- df %>% filter(instrument == input$filter_instrument_items)
     if (!is.null(input$filter_scale_items) && input$filter_scale_items != "All") df <- df %>% filter(scale == input$filter_scale_items)
     if (!is.null(input$filter_type_items) && input$filter_type_items != "All") df <- df %>% filter(item_type == input$filter_type_items)
@@ -1109,7 +1113,7 @@ server <- function(input, output, session) {
   observeEvent(input$reset_item_filters, {
     updateSelectInput(session, "filter_study_items", selected = "All"); updateSelectInput(session, "filter_year_items", selected = "All")
     updateSelectInput(session, "filter_cycle_items", selected = "All"); updateSelectInput(session, "filter_population_items", selected = "All")
-    updateSelectInput(session, "filter_instrument_items", selected = "All"); updateSelectInput(session, "filter_scale_items", selected = "All")
+    updateSelectInput(session, "filter_target_items", selected = "All"); updateSelectInput(session, "filter_instrument_items", selected = "All"); updateSelectInput(session, "filter_scale_items", selected = "All")
     updateSelectInput(session, "filter_type_items", selected = "All"); updateSelectInput(session, "filter_puf_items", selected = "All")
     updateTextInput(session, "search_items", value = "")
   })
@@ -1118,7 +1122,8 @@ server <- function(input, output, session) {
   output$filter_study_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$study))); selectInput("filter_study_scales", "Study", choices = c("All", choices)) })
   output$filter_year_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$year))); selectInput("filter_year_scales", "Year", choices = c("All", choices)) })
   output$filter_cycle_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$cycle))); selectInput("filter_cycle_scales", "Cycle", choices = c("All", choices)) })
-  output$filter_population_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$population))); selectInput("filter_population_scales", "Target", choices = c("All", choices)) })
+  output$filter_population_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$population))); selectInput("filter_population_scales", "Population", choices = c("All", choices)) })
+  output$filter_target_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$target))); selectInput("filter_target_scales", "Target grade", choices = c("All", choices)) })
   output$filter_instrument_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$instrument))); selectInput("filter_instrument_scales", "Instrument", choices = c("All", choices)) })
 
   filtered_scales <- reactive({
@@ -1127,8 +1132,10 @@ server <- function(input, output, session) {
     if (!is.null(input$filter_year_scales) && input$filter_year_scales != "All") admins <- admins %>% filter(year == input$filter_year_scales)
     if (!is.null(input$filter_cycle_scales) && input$filter_cycle_scales != "All") admins <- admins %>% filter(cycle == input$filter_cycle_scales)
     if (!is.null(input$filter_population_scales) && input$filter_population_scales != "All") admins <- admins %>% filter(population == input$filter_population_scales)
+    if (!is.null(input$filter_target_scales) && input$filter_target_scales != "All") admins <- admins %>% filter(target == input$filter_target_scales)
     if (!is.null(input$filter_instrument_scales) && input$filter_instrument_scales != "All") admins <- admins %>% filter(instrument == input$filter_instrument_scales)
     df <- scales_data() %>% filter(scale_uid %in% admins$scale_uid)
+    if (isTRUE(input$filter_scaled_only)) df <- df %>% filter(is_scaled %in% TRUE)
     if (!is.null(input$search_scales) && nzchar(input$search_scales)) {
       q <- tolower(input$search_scales)
       matching_uids <- admins %>% filter(grepl(q, tolower(scale), fixed = TRUE) | grepl(q, tolower(scale_id), fixed = TRUE) | grepl(q, tolower(scale_varname), fixed = TRUE)) %>% pull(scale_uid)
@@ -1144,7 +1151,7 @@ server <- function(input, output, session) {
       mutate(details = vapply(scale_uid, function(x) grid_details_button_for("grid_scale_details_uid", x), character(1))) %>%
       select(scale_uid, scale_name, varnames, studies, years, n_items, n_versions, details)
   })
-  output$scales_count <- renderUI(h5(paste(nrow(scales_grid()), "scales found")))
+  output$scales_count <- renderUI(h5(paste(nrow(scales_grid()), "derived variables found")))
   output$scales_table <- renderDT(datatable_scales_grid(scales_grid()))
   selected_scale_uids <- reactive(scales_grid()$scale_uid[input$scales_table_rows_selected])
   observeEvent(input$grid_add_scales, {
@@ -1159,14 +1166,15 @@ server <- function(input, output, session) {
   observeEvent(input$reset_scale_filters, {
     updateSelectInput(session, "filter_study_scales", selected = "All"); updateSelectInput(session, "filter_year_scales", selected = "All")
     updateSelectInput(session, "filter_cycle_scales", selected = "All"); updateSelectInput(session, "filter_population_scales", selected = "All")
-    updateSelectInput(session, "filter_instrument_scales", selected = "All"); updateTextInput(session, "search_scales", value = "")
+    updateSelectInput(session, "filter_target_scales", selected = "All"); updateSelectInput(session, "filter_instrument_scales", selected = "All"); updateCheckboxInput(session, "filter_scaled_only", value = FALSE); updateTextInput(session, "search_scales", value = "")
   })
 
   # Category filters / grid
   output$filter_study_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$study))); selectInput("filter_study_categories", "Study", choices = c("All", choices)) })
   output$filter_year_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$year))); selectInput("filter_year_categories", "Year", choices = c("All", choices)) })
   output$filter_cycle_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$cycle))); selectInput("filter_cycle_categories", "Cycle", choices = c("All", choices)) })
-  output$filter_population_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$population))); selectInput("filter_population_categories", "Target", choices = c("All", choices)) })
+  output$filter_population_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$population))); selectInput("filter_population_categories", "Population", choices = c("All", choices)) })
+  output$filter_target_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$target))); selectInput("filter_target_categories", "Target grade", choices = c("All", choices)) })
   output$filter_instrument_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$instrument))); selectInput("filter_instrument_categories", "Instrument", choices = c("All", choices)) })
 
   filtered_categories <- reactive({
@@ -1175,6 +1183,7 @@ server <- function(input, output, session) {
     if (!is.null(input$filter_year_categories) && input$filter_year_categories != "All") admins <- admins %>% filter(year == input$filter_year_categories)
     if (!is.null(input$filter_cycle_categories) && input$filter_cycle_categories != "All") admins <- admins %>% filter(cycle == input$filter_cycle_categories)
     if (!is.null(input$filter_population_categories) && input$filter_population_categories != "All") admins <- admins %>% filter(population == input$filter_population_categories)
+    if (!is.null(input$filter_target_categories) && input$filter_target_categories != "All") admins <- admins %>% filter(target == input$filter_target_categories)
     if (!is.null(input$filter_instrument_categories) && input$filter_instrument_categories != "All") admins <- admins %>% filter(instrument == input$filter_instrument_categories)
     df <- categories_data() %>% filter(category_id %in% admins$category_id)
     if (!is.null(input$search_categories) && nzchar(input$search_categories)) {
@@ -1189,7 +1198,7 @@ server <- function(input, output, session) {
       mutate(details = vapply(category_id, function(x) grid_details_button_for("grid_category_details_id", x), character(1))) %>%
       select(category_id, category_name, studies, years, n_items, details)
   })
-  output$categories_count <- renderUI(h5(paste(nrow(categories_grid()), "categories found")))
+  output$categories_count <- renderUI(h5(paste(nrow(categories_grid()), "topics found")))
   output$categories_table <- renderDT(datatable_categories_grid(categories_grid()))
   selected_category_ids <- reactive(categories_grid()$category_id[input$categories_table_rows_selected])
   observeEvent(input$grid_add_categories, {
@@ -1204,7 +1213,7 @@ server <- function(input, output, session) {
   observeEvent(input$reset_category_filters, {
     updateSelectInput(session, "filter_study_categories", selected = "All"); updateSelectInput(session, "filter_year_categories", selected = "All")
     updateSelectInput(session, "filter_cycle_categories", selected = "All"); updateSelectInput(session, "filter_population_categories", selected = "All")
-    updateSelectInput(session, "filter_instrument_categories", selected = "All"); updateTextInput(session, "search_categories", value = "")
+    updateSelectInput(session, "filter_target_categories", selected = "All"); updateSelectInput(session, "filter_instrument_categories", selected = "All"); updateTextInput(session, "search_categories", value = "")
   })
 
   # Questionnaire filters / grid
