@@ -229,14 +229,14 @@ grid_details_button <- function(item_uid) {
 datatable_items_grid <- function(df) {
   datatable(
     df, rownames = FALSE, escape = FALSE, selection = "multiple",
-    colnames = c("Item UID", "Item", "Topic", "Studies", "Years", "Versions", ""),
+    colnames = c("Item UID", "Item", "Studies", "Years", "Versions", ""),
     options = list(
       dom = "lrtip", pageLength = 25, lengthMenu = c(10, 25, 50, 100),
       scrollX = TRUE, autoWidth = FALSE,
       columnDefs = list(
         list(targets = 1, width = "40%"),
-        list(targets = 5, className = "dt-center"),
-        list(targets = 6, orderable = FALSE, searchable = FALSE, className = "dt-center")
+        list(targets = 4, className = "dt-center"),
+        list(targets = 5, orderable = FALSE, searchable = FALSE, className = "dt-center")
       )
     )
   )
@@ -261,7 +261,7 @@ datatable_scales_grid <- function(df) {
 datatable_categories_grid <- function(df) {
   datatable(
     df, rownames = FALSE, escape = FALSE, selection = "multiple",
-    colnames = c("Topic ID", "Topic", "Studies", "Years", "Items", ""),
+    colnames = c("ID", "Name", "Studies", "Years", "Items", ""),
     options = list(
       dom = "lrtip", pageLength = 25, lengthMenu = c(10, 25, 50, 100),
       scrollX = TRUE, autoWidth = FALSE,
@@ -1143,7 +1143,7 @@ server <- function(input, output, session) {
 
   items_grid <- reactive({
     filtered_items() %>% group_by(item_uid) %>%
-      summarise(item_name = first(item_name), category = first(category_name),
+      summarise(item_name = first(item_name),
                 studies = paste(sort(unique(study[study != ""])), collapse = ", "),
                 years = paste(sort(unique(year[year != ""])), collapse = ", "),
                 n_versions = n_distinct(item_code), .groups = "drop") %>%
@@ -1321,7 +1321,7 @@ server <- function(input, output, session) {
     if (nrow(df) == 0) {
       return(datatable_cart(tibble(item_code = character(), wording = character(), study = character(), year = character(), cycle = character(), population = character(), instrument = character(), scale = character())))
     }
-    df %>% select(item_uid, item_code, item_name, category_id, category_name, wording, source_variable,
+    df %>% select(item_uid, item_code, item_name, wording, source_variable,
                   study, phase, year, cycle, population, instrument, scale, scale_varname, item_type, dataset_label, puf) %>%
       datatable_cart()
   })
