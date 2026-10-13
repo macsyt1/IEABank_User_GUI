@@ -277,13 +277,13 @@ datatable_categories_grid <- function(df) {
 datatable_questionnaires_grid <- function(df) {
   datatable(
     df, rownames = FALSE, escape = FALSE, selection = "multiple",
-    colnames = c("Study", "Year", "Cycle", "Target", "Instrument", "Items", "Sections", "Derived Variables", ""),
+    colnames = c("Study", "Year", "Cycle", "Target", "Instrument", "Items", "Derived Variables", ""),
     options = list(
       dom = "lrtip", pageLength = 25, lengthMenu = c(10, 25, 50, 100),
       scrollX = TRUE, autoWidth = FALSE,
       columnDefs = list(
-        list(targets = c(5, 6, 7), className = "dt-center"),
-        list(targets = 8, orderable = FALSE, searchable = FALSE, className = "dt-center")
+        list(targets = c(5, 6), className = "dt-center"),
+        list(targets = 7, orderable = FALSE, searchable = FALSE, className = "dt-center")
       )
     )
   )
@@ -510,11 +510,10 @@ derive_category_items <- function(cat_id, items) {
 derive_questionnaires <- function(items) {
   if (nrow(items) == 0) return(tibble())
   items %>%
-    distinct(study, phase, year, cycle, population, instrument, section, scale, item_uid) %>%
-    group_by(study, phase, year, cycle, population, instrument) %>%
+    distinct(study, phase, year, cycle, population, instrument, target, scale, item_uid) %>%
+    group_by(study, phase, year, cycle, population, instrument, target) %>%
     summarise(
       n_items = n_distinct(item_uid),
-      n_sections = n_distinct(section[section != ""], na.rm = TRUE),
       n_scales = n_distinct(scale[scale != ""], na.rm = TRUE), .groups = "drop"
     ) %>%
     mutate(
@@ -991,7 +990,7 @@ server <- function(input, output, session) {
       div(class = "detail-modal",
           layout_columns(col_widths = c(6, 6),
                          div(class = "detail-section", h5("Questionnaire"), p(strong("Study: "), questionnaire_row$study), p(strong("Year: "), questionnaire_row$year), p(strong("Cycle: "), questionnaire_row$cycle)),
-                         div(class = "detail-section", h5("Instrument"), p(strong("Target: "), questionnaire_row$population), p(strong("Instrument: "), questionnaire_row$instrument), p(strong("Items: "), questionnaire_row$n_items), p(strong("Sections: "), questionnaire_row$n_sections), p(strong("Scales: "), questionnaire_row$n_scales))),
+                         div(class = "detail-section", h5("Instrument"), p(strong("Target: "), questionnaire_row$target), p(strong("Instrument: "), questionnaire_row$instrument), p(strong("Items: "), questionnaire_row$n_items), p(strong("Scales: "), questionnaire_row$n_scales))),
           div(class = "detail-section", h5("Items in this questionnaire"),
               p(class = "text-muted", "Filter by one or more scales, select rows to add specific items, or add the complete questionnaire."),
               actionButton("modal_add_questionnaire_all", "Add complete questionnaire", class = "btn btn-primary btn-modal-action"),
@@ -1262,7 +1261,7 @@ server <- function(input, output, session) {
   questionnaires_grid <- reactive({
     filtered_questionnaires() %>%
       mutate(details = vapply(questionnaire_uid, function(x) grid_details_button_for("grid_questionnaire_details_uid", x), character(1))) %>%
-      select(study, year, cycle, population, instrument, n_items, n_sections, n_scales, details)
+      select(study, year, cycle, target, instrument, n_items, n_scales, details)
   })
   output$questionnaires_count <- renderUI(h5(paste(nrow(questionnaires_grid()), "questionnaires found")))
   output$questionnaires_table <- renderDT(datatable_questionnaires_grid(questionnaires_grid()))
