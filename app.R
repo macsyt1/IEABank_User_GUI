@@ -1033,7 +1033,20 @@ server <- function(input, output, session) {
     )
   })
   output$category_items_table <- renderDT({
-    datatable_items_grid(modal_category_items() %>% mutate(category = "") %>% select(item_uid, item_name, category, studies, years, n_versions, details))
+    datatable(
+      modal_category_items() %>% select(item_uid, item_name, studies, years, n_versions, details),
+      rownames = FALSE, escape = FALSE, selection = "multiple",
+      colnames = c("Item UID", "Item", "Studies", "Years", "Versions", ""),
+      options = list(
+        dom = "lrtip", pageLength = 25, lengthMenu = c(10, 25, 50, 100),
+        scrollX = TRUE, autoWidth = FALSE,
+        columnDefs = list(
+          list(targets = 1, width = "45%"),
+          list(targets = 4, className = "dt-center"),
+          list(targets = 5, orderable = FALSE, searchable = FALSE, className = "dt-center")
+        )
+      )
+    )
   })
   output$category_composition_matrix <- renderUI(version_matrix_ui(modal_category_composition(), row_label = "Item UID"))
   output$scale_versions_table <- renderDT({
