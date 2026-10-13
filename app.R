@@ -467,6 +467,17 @@ derive_composition <- function(group_col, group_val, items, study_sel, populatio
       if (nrow(administered) > 0) "–" else ""
     }, character(1))
   }
+  # The first column is only a display label, not an identifier used for joins.
+  labels <- items %>%
+    filter(item_uid %in% item_uids) %>%
+    group_by(item_uid) %>%
+    summarise(item_name = first(item_name[!is.na(item_name) & nzchar(item_name)],
+                                default = ""), .groups = "drop")
+  names_lookup <- setNames(labels$item_name, labels$item_uid)
+  item_names <- unname(names_lookup[out$item_uid])
+  out$item_uid <- ifelse(is.na(item_names) | !nzchar(item_names),
+                         out$item_uid,
+                         paste(out$item_uid, item_names, sep = " - "))
   as_tibble(out)
 }
 
@@ -792,6 +803,7 @@ main_ui <- function() page_navbar(
       class = "cart-summary", uiOutput("cart_summary"),
       div(class = "mt-2",
           downloadButton("download_excel", "Download Excel", class = "btn btn-primary"),
+          actionButton("remove_selected_cart", "Remove selected", class = "btn btn-outline-danger"),
           actionButton("clear_cart", "Clear cart", class = "btn btn-outline-secondary"))
     ),
     DTOutput("cart_table")
@@ -942,7 +954,7 @@ server <- function(input, output, session) {
           div(class = "detail-section", h5("Derived variable’s composition over time"),
               p(class = "text-muted", "Rows are item UIDs, columns are years. A cell shows the item version used that year; a dash means the item was administered but was not part of the scale."),
               selectInput("scale_composition_scope", "Study and instrument",
-                          choices = setNames(paste(scopes$study, scopes$population, scopes$instrument, sep = "|"), paste0(scopes$study, " · ", scopes$population, scopes$instrument)), width = "360px"),
+                          choices = setNames(paste(scopes$study, scopes$population, scopes$instrument, sep = "|"), paste0(scopes$study, " · ", scopes$instrument)), width = "360px"),
               uiOutput("scale_composition_matrix")))
     ))
   }
@@ -961,7 +973,7 @@ server <- function(input, output, session) {
           div(class = "detail-section", h5("Longitudinal category composition"),
               p(class = "text-muted", "Rows are item UIDs, columns are years. A cell shows the item version used that year."),
               selectInput("category_composition_scope", "Study and instrument",
-                          choices = setNames(paste(scopes$study, scopes$population, scopes$instrument, sep = "|"), paste0(scopes$study, " · ", scopes$population, scopes$instrument)), width = "360px"),
+                          choices = setNames(paste(scopes$study, scopes$population, scopes$instrument, sep = "|"), paste0(scopes$study, " · ", scopes$instrument)), width = "360px"),
               uiOutput("category_composition_matrix")))
     ))
   }
@@ -1288,6 +1300,17 @@ server <- function(input, output, session) {
     df %>% select(item_uid, item_code, item_name, category_id, category_name, wording, source_variable,
                   study, phase, year, cycle, population, instrument, scale, scale_varname, item_type, dataset_label, puf) %>%
       datatable_cart()
+  })
+  observeEvent(input$remove_selected_cart, {
+    selected_rows <- input$cart_table_rows_selected
+    current <- cart()
+    if (nrow(current) == 0 || is.null(selected_rows) || length(selected_rows) == 0) {
+      showNotification("Select one or more rows from the cart first.", type = "warning", duration = 4)
+      return(invisible(NULL))
+    }
+    keep <- setdiff(seq_len(nrow(current)), selected_rows)
+    cart(current[keep, , drop = FALSE])
+    showNotification(paste(length(selected_rows), "selected version(s) removed."), type = "message", duration = 3)
   })
   observeEvent(input$clear_cart, cart(tibble()))
 
