@@ -30,8 +30,8 @@ APP_VERSION <- "0.3.0"
 # ------------------------------------------------------------
 # Institutional colors
 # ------------------------------------------------------------
-iea_blue <- "#0070b8"
-iea_red  <- "#e2211c"
+iea_blue <- "#0071b9"
+iea_red  <- "#d91a15"
 
 # ------------------------------------------------------------
 # Conexión
@@ -277,7 +277,7 @@ datatable_categories_grid <- function(df) {
 datatable_questionnaires_grid <- function(df) {
   datatable(
     df, rownames = FALSE, escape = FALSE, selection = "multiple",
-    colnames = c("Study", "Year", "Cycle", "Target", "Instrument", "Items", "Sections", "Scales", ""),
+    colnames = c("Study", "Year", "Cycle", "Target", "Instrument", "Items", "Sections", "Derived Variables", ""),
     options = list(
       dom = "lrtip", pageLength = 25, lengthMenu = c(10, 25, 50, 100),
       scrollX = TRUE, autoWidth = FALSE,
@@ -338,22 +338,52 @@ standardize_items <- function(df) {
 # ------------------------------------------------------------
 
 get_items <- function(pool) {
-  item_admin <- tbl(pool, "item_admin")
-  admin_tbl <- tbl(pool, "admin") %>% select(admin_id, study, phase, year, instrument, target, cycle)
-  scale_items <- tbl(pool, "scale_items") %>%
-    left_join(tbl(pool, "scale_version"), by = "scale_id") %>%
-    left_join(tbl(pool, "scale"), by = "scale_uid") %>%
-    select(item_admin_pk, scale_uid, scale_var, scale_name, scale_id, scale_description, scale_varname)
-  item_tbl <- tbl(pool, "item_id") %>% select(item_uid, item_name, category_id)
-  category_tbl <- tbl(pool, "category") %>% select(category_id, category_name)
-
-  item_admin %>%
-    left_join(admin_tbl, by = "admin_id") %>%
-    left_join(scale_items, by = "item_admin_pk") %>%
-    left_join(item_tbl, by = "item_uid") %>%
-    left_join(category_tbl, by = "category_id") %>%
-    collect() %>%
-    standardize_items()
+  # Adapt the new October 2026 database contract to the Explorer's display model.
+  # Keep one row per index membership, so a single item may appear in multiple indices.
+  items <- tbl(pool, "item_admin") %>%
+    filter(is_public_itembank == TRUE) %>%
+    left_join(
+      tbl(pool, "admin") %>% select(admin_id, study, phase, year, instrument_name,
+                                   instrument_pop, target_grade, cycle_num),
+      by = "admin_id"
+    ) %>%
+    left_join(
+      tbl(pool, "item") %>% select(item_uid, item_name, topic_id),
+      by = "item_uid"
+    ) %>%
+    left_join(
+      tbl(pool, "topic") %>% select(topic_id, category_name),
+      by = "topic_id"
+    ) %>%
+    left_join(
+      tbl(pool, "index_item") %>%
+        left_join(tbl(pool, "index_version") %>% filter(is_public_itembank == TRUE),
+                  by = "index_id") %>%
+        left_join(tbl(pool, "index"), by = "index_uid") %>%
+        select(item_admin_pk, index_uid, index_var, index_name, index_id,
+               index_version_description, index_varname, is_scaled, index_puf = is_puf),
+      by = "item_admin_pk"
+    ) %>%
+    collect()
+  if (nrow(items) == 0) return(items)
+  items <- items %>%
+    mutate(
+      item_admin_id = item_id,
+      category_id = topic_id,
+      scale_id = index_id, scale_uid = index_uid,
+      scale_var = index_var, scale_name = index_name,
+      scale_varname = index_varname, scale_description = index_version_description,
+      instrument = instrument_name, population = instrument_pop,
+      target = target_grade, cycle = cycle_num,
+      type = response_type, puf = is_puf,
+      wording_item = coalesce(wording_item, wording_question),
+      wording_question = if_else(
+        !is.na(wording_question_add) & nzchar(wording_question_add),
+        paste(coalesce(wording_question, ""), wording_question_add, sep = " / "),
+        wording_question
+      )
+    )
+  standardize_items(items)
 }
 
 get_item_history <- function(pool, selected_item_uids) tibble()
@@ -361,28 +391,40 @@ get_item_variants <- function(pool, selected_item_uids) tibble()
 get_item_examples <- function(pool) read_table_safe(pool, "item_example")
 
 get_scale_membership <- function(pool, selected_items) {
-  df <- read_table_safe(pool, "scale_items")
+  df <- read_table_safe(pool, "index_item")
   if (nrow(df) == 0) return(tibble())
-  df %>% left_join(read_table_safe(pool, "scale_version"), by = "scale_id") %>%
+  df %>% left_join(read_table_safe(pool, "index_version"), by = "index_id") %>%
+    mutate(scale_id = index_id, scale_uid = index_uid, scale_var = index_var,
+           scale_varname = index_varname, scale_description = index_version_description) %>%
     filter(item_admin_pk %in% selected_items$item_admin_pk)
 }
 
 get_response_options <- function(pool, selected_items) {
   selected_response_ids <- selected_items %>% filter(!is.na(response_id), response_id != "") %>% distinct(response_id) %>% pull(response_id)
   if (length(selected_response_ids) == 0) return(tibble())
-  response_values <- read_table_safe(pool, "value_scheme_value")
+  response_values <- read_table_safe(pool, "response_scheme_values")
   if (nrow(response_values) == 0) return(tibble())
   if (!"response_id" %in% names(response_values)) return(response_values)
-  response_values %>% filter(response_id %in% selected_response_ids)
+  response_values %>% filter(response_id %in% selected_response_ids) %>%
+    mutate(
+      value = response_value,
+      label = if_else(
+        !is.na(checked_value) & !is.na(not_checked_value),
+        paste0(coalesce(response_label, ""), " (", checked_value,
+               " = Checked; ", not_checked_value, " = Not checked)"),
+        coalesce(response_label, "")
+      )
+    )
 }
 
 get_missing_values <- function(pool, selected_items) {
   selected_miss_ids <- selected_items %>% filter(!is.na(miss_id), miss_id != "") %>% distinct(miss_id) %>% pull(miss_id)
   if (length(selected_miss_ids) == 0) return(tibble())
-  miss_values <- read_table_safe(pool, "miss_scheme_value")
+  miss_values <- read_table_safe(pool, "miss_scheme_values")
   if (nrow(miss_values) == 0) return(tibble())
   if (!"miss_id" %in% names(miss_values)) return(miss_values)
-  miss_values %>% filter(miss_id %in% selected_miss_ids)
+  miss_values %>% filter(miss_id %in% selected_miss_ids) %>%
+    mutate(value = miss_value, category = miss_description)
 }
 
 get_variables_and_data <- function(pool, selected_items) {
@@ -402,6 +444,7 @@ derive_scales <- function(items) {
       studies = paste(sort(unique(study[study != ""])), collapse = ", "),
       years = paste(sort(unique(year[year != ""])), collapse = ", "),
       n_versions = n_distinct(scale_id),
+      is_scaled = any(is_scaled %in% TRUE),
       n_items = n_distinct(item_uid), .groups = "drop"
     ) %>% arrange(scale_uid)
 }
@@ -409,7 +452,7 @@ derive_scales <- function(items) {
 derive_scale_admins <- function(items) {
   if (nrow(items) == 0) return(tibble())
   items %>% filter(scale_uid != "") %>%
-    distinct(scale_uid, scale_id, scale_var, scale_varname, scale, admin_id, study, phase, year, cycle, population, instrument) %>%
+    distinct(scale_uid, scale_id, scale_var, scale_varname, scale, admin_id, study, phase, year, cycle, population, instrument, target) %>%
     arrange(scale_uid, year, scale_var)
 }
 
@@ -444,7 +487,7 @@ derive_categories <- function(items) {
 derive_category_admins <- function(items) {
   if (nrow(items) == 0) return(tibble())
   items %>% filter(category_id != "") %>%
-    distinct(category_id, admin_id, study, phase, year, cycle, population, instrument)
+    distinct(category_id, admin_id, study, phase, year, cycle, population, instrument, target)
 }
 
 derive_category_items <- function(cat_id, items) {
@@ -661,14 +704,13 @@ main_ui <- function() page_navbar(
       col_widths = c(3, 9),
       div(
         class = "filter-panel", h5("Filters"),
-        uiOutput("filter_study_items_ui"), uiOutput("filter_year_items_ui"), uiOutput("filter_cycle_items_ui"),
-        uiOutput("filter_population_items_ui"), uiOutput("filter_instrument_items_ui"), uiOutput("filter_scale_items_ui"),
+        uiOutput("filter_study_items_ui"), uiOutput("filter_year_items_ui"), uiOutput("filter_population_items_ui"), uiOutput("filter_target_items_ui"), uiOutput("filter_instrument_items_ui"), uiOutput("filter_scale_items_ui"),
         uiOutput("filter_type_items_ui"), uiOutput("filter_puf_items_ui"),
         actionButton("reset_item_filters", "Reset filters", class = "btn btn-outline-secondary btn-sm")
       ),
       div(
         uiOutput("items_count"),
-        textInput("search_items", NULL, placeholder = "Search within items, wording, variable, category, scale or section..."),
+        textInput("search_items", NULL, placeholder = "Search within item IDs, wording, variable, topic, derived variable or section..."),
         div(class = "mb-2", actionButton("grid_add_items", "+ Add selected", class = "btn btn-sm btn-primary")),
         DTOutput("items_table")
       )
@@ -676,19 +718,19 @@ main_ui <- function() page_navbar(
   ),
 
   nav_panel(
-    "Scales",
-    page_header("Explore Scales", "Browse constructs and item groups across studies and cycles."),
+    "Derived Variables",
+    page_header("Explore Derived Variables", "Browse derived variables and their item composition across studies and cycles."),
     layout_columns(
       col_widths = c(3, 9),
       div(
         class = "filter-panel", h5("Filters"),
-        uiOutput("filter_study_scales_ui"), uiOutput("filter_year_scales_ui"), uiOutput("filter_cycle_scales_ui"),
-        uiOutput("filter_population_scales_ui"), uiOutput("filter_instrument_scales_ui"),
+        uiOutput("filter_study_scales_ui"), uiOutput("filter_year_scales_ui"), uiOutput("filter_population_scales_ui"), uiOutput("filter_target_scales_ui"), uiOutput("filter_instrument_scales_ui"),
+        checkboxInput("filter_scaled_only", "Construct scales only", value = FALSE),
         actionButton("reset_scale_filters", "Reset filters", class = "btn btn-outline-secondary btn-sm")
       ),
       div(
         uiOutput("scales_count"),
-        textInput("search_scales", NULL, placeholder = "Search within scales, scale variables, study, cycle, target or instrument..."),
+        textInput("search_scales", NULL, placeholder = "Search within derived variables, study, year, target or instrument..."),
         div(class = "mb-2", actionButton("grid_add_scales", "+ Add selected", class = "btn btn-sm btn-primary")),
         DTOutput("scales_table")
       )
@@ -696,19 +738,18 @@ main_ui <- function() page_navbar(
   ),
 
   nav_panel(
-    "Categories",
-    page_header("Categories", "Browse the constructs items belong to, independently of administration."),
+    "Topics",
+    page_header("Topics", "Browse item topics independently of administration."),
     layout_columns(
       col_widths = c(3, 9),
       div(
         class = "filter-panel", h5("Filters"),
-        uiOutput("filter_study_categories_ui"), uiOutput("filter_year_categories_ui"), uiOutput("filter_cycle_categories_ui"),
-        uiOutput("filter_population_categories_ui"), uiOutput("filter_instrument_categories_ui"),
+        uiOutput("filter_study_categories_ui"), uiOutput("filter_year_categories_ui"), uiOutput("filter_population_categories_ui"), uiOutput("filter_target_categories_ui"), uiOutput("filter_instrument_categories_ui"),
         actionButton("reset_category_filters", "Reset filters", class = "btn btn-outline-secondary btn-sm")
       ),
       div(
         uiOutput("categories_count"),
-        textInput("search_categories", NULL, placeholder = "Search within categories..."),
+        textInput("search_categories", NULL, placeholder = "Search within topics..."),
         div(class = "mb-2", actionButton("grid_add_categories", "+ Add selected", class = "btn btn-sm btn-primary")),
         DTOutput("categories_table")
       )
@@ -716,8 +757,8 @@ main_ui <- function() page_navbar(
   ),
 
   nav_panel(
-    "Questionnaires",
-    page_header("Explore Questionnaires", "Browse complete questionnaires and instruments."),
+    "Instruments",
+    page_header("Explore Instruments", "Browse available instruments and questionnaires."),
     layout_columns(
       col_widths = c(3, 9),
       div(
@@ -735,9 +776,22 @@ main_ui <- function() page_navbar(
     )
   ),
 
+  nav_panel("Glossary",
+    page_header("Glossary", "Definitions and documentation will be added here."),
+    p("Work in progress.")
+  ),
+  nav_panel("Tutorial",
+    page_header("How to Use the IEA Item Bank", "Step-by-step guidance will be added here."),
+    p("Work in progress.")
+  ),
+  nav_panel("Latest News",
+    page_header("Latest News", "Project updates and changelog."),
+    p("Work in progress.")
+  ),
+
   nav_panel(
-    "Selection Cart",
-    page_header("Selection Cart", "Review selected unique items and export structured metadata."),
+    "Export Selection",
+    page_header("Export Selection", "Review selected unique items and export structured metadata."),
     div(
       class = "cart-summary", uiOutput("cart_summary"),
       div(class = "mt-2",
@@ -800,8 +854,8 @@ server <- function(input, output, session) {
   category_admins_data <- reactive(derive_category_admins(items_data()))
   questionnaires_data <- reactive(derive_questionnaires(items_data()))
   examples_data <- reactive(get_item_examples(pool))
-  response_values_data <- reactive(read_table_safe(pool, "value_scheme_value"))
-  missing_values_data <- reactive(read_table_safe(pool, "miss_scheme_value"))
+  response_values_data <- reactive(read_table_safe(pool, "response_scheme_values") %>% mutate(value = response_value, label = if_else(!is.na(checked_value) & !is.na(not_checked_value), paste0(coalesce(response_label, ""), " (", checked_value, " = Checked; ", not_checked_value, " = Not checked)"), coalesce(response_label, ""))))
+  missing_values_data <- reactive(read_table_safe(pool, "miss_scheme_values") %>% mutate(value = miss_value, category = miss_description))
 
   # Modal stores
   modal_item <- reactiveVal(tibble())
@@ -856,8 +910,8 @@ server <- function(input, output, session) {
       footer = tagList(actionButton("modal_add_item_to_cart", "Add item to cart", class = "btn btn-primary"), modalButton("Close")),
       div(class = "detail-modal",
           div(class = "detail-section", h5(item$item_name), p(class = "text-muted", paste(uid, "·", item$category_id, "-", item$category_name))),
-          div(class = "detail-section", h5("Variants"), DTOutput("item_variants_table")),
-          div(class = "detail-section", h5("Longitudinal item participation"), uiOutput("item_version_matrix")),
+          div(class = "detail-section", h5("Versions"), DTOutput("item_variants_table")),
+          div(class = "detail-section", h5("Item versions over time"), uiOutput("item_version_matrix")),
           div(class = "detail-section",
               selectInput("modal_version", "Select version",
                           choices = setNames(paste(versions$item_admin_id, versions$admin_id, sep = "|"), paste(versions$item_admin_id, "-", versions$admin_id)),
@@ -872,18 +926,24 @@ server <- function(input, output, session) {
       distinct(scale_id, scale_var, scale_varname, admin_id, study, year, population, instrument) %>% arrange(year, scale_var)
     scopes <- admins %>% distinct(study, population, instrument)
     showModal(modalDialog(
-      title = paste("Scale details:", scale_row$scale_name), size = "xl", easyClose = TRUE, footer = modalButton("Close"),
+      title = paste("Derived variable details:", scale_row$scale_name), size = "xl", easyClose = TRUE, footer = modalButton("Close"),
       div(class = "detail-modal",
+          if (any(all_items$scale_uid == scale_row$scale_uid &
+                  !is.na(all_items$index_puf) & !all_items$index_puf)) {
+            div(class = "alert alert-warning",
+                "Attention: For data protection reasons, this derived variable has been left out from the public use data. Researchers interested in using these additional variables for analysis can apply to get the restricted use data. More information in: ",
+                tags$a(href = "https://www.iea.nl/data-tools/repository/", target = "_blank", "IEA Data Repository"))
+          },
           div(class = "detail-section", h5(scale_row$scale_name),
               p(class = "text-muted", paste(scale_row$scale_uid, "·", scale_row$n_versions, "versions ·", scale_row$n_items, "items"))),
           div(class = "detail-section", h5("Versions"), DTOutput("scale_versions_table")),
-          div(class = "detail-section", h5("Items in this scale"),
+          div(class = "detail-section", h5("Items in this derived variable"),
               selectInput("scale_admin_selector", "Administration",
                           choices = setNames(paste(admins$scale_id, admins$admin_id, sep = "|"), paste(admins$scale_varname, "-", admins$admin_id)), width = "360px"),
               actionButton("modal_add_scale_all", "Add all items in this scale", class = "btn btn-primary btn-modal-action"),
               actionButton("modal_add_scale_selected", "Add selected items", class = "btn btn-outline-primary btn-modal-action"),
               DTOutput("scale_items_table")),
-          div(class = "detail-section", h5("Longitudinal scale composition"),
+          div(class = "detail-section", h5("Derived variable’s composition over time"),
               p(class = "text-muted", "Rows are item UIDs, columns are years. A cell shows the item version used that year; a dash means the item was administered but was not part of the scale."),
               selectInput("scale_composition_scope", "Study and instrument",
                           choices = setNames(paste(scopes$study, scopes$population, scopes$instrument, sep = "|"), paste0(scopes$study, " · ", scopes$population, scopes$instrument)), width = "360px"),
@@ -895,7 +955,7 @@ server <- function(input, output, session) {
     modal_category_id(category_row$category_id)
     scopes <- all_items %>% filter(category_id == category_row$category_id) %>% distinct(study, population, instrument)
     showModal(modalDialog(
-      title = paste("Category details:", category_row$category_name), size = "xl", easyClose = TRUE, footer = modalButton("Close"),
+      title = paste("Topic details:", category_row$category_name), size = "xl", easyClose = TRUE, footer = modalButton("Close"),
       div(class = "detail-modal",
           div(class = "detail-section", h5(category_row$category_name),
               p(class = "text-muted", paste(category_row$category_id, "·", category_row$n_items, "items ·", category_row$studies, "·", category_row$years))),
@@ -952,10 +1012,13 @@ server <- function(input, output, session) {
     tagList(
       layout_columns(col_widths = c(6, 6),
                      div(h6("Wording"), p(strong("Heading: "), v$wording_heading), p(strong("Question: "), v$wording_question), p(strong("Instruction: "), v$wording_instruction), p(strong("Item: "), v$wording)),
-                     div(h6("Administration"), p(strong("Administration: "), v$admin_id), p(strong("Variable: "), v$source_variable), p(strong("Dataset label: "), v$dataset_label), p(strong("Item type: "), v$item_type), p(strong("PUF: "), as.character(v$puf)), p(strong("Scale(s): "), ifelse(v$scale_names == "", "Not assigned", v$scale_names)))),
+                     div(h6("Administration"), p(strong("Administration: "), v$admin_id), p(strong("Variable: "), v$source_variable), p(strong("Dataset label: "), v$dataset_label), p(strong("Item type: "), v$item_type), p(strong("PUF: "), as.character(v$puf)), p(strong("Derived variable(s): "), ifelse(v$scale_names == "", "Not assigned", v$scale_names)))),
       layout_columns(col_widths = c(6, 6),
                      div(h6(paste("Response scheme:", v$response_id)), value_table_ui(responses %>% select(value, label))),
                      div(h6(paste("Missing scheme:", v$miss_id)), value_table_ui(missings %>% select(value, category)))),
+      if (!isTRUE(v$puf[[1]])) div(class = "alert alert-warning",
+        "Attention: For data protection reasons, this variable has been left out from the public use data. Researchers interested in using these additional variables for analysis can apply to get the restricted use data. More information in: ",
+        tags$a(href = "https://www.iea.nl/data-tools/repository/", target = "_blank", "IEA Data Repository")),
       actionButton("modal_add_version_to_cart", paste("+ Add", v$item_admin_id, "-", v$admin_id), class = "btn btn-sm btn-primary")
     )
   })
@@ -1000,15 +1063,16 @@ server <- function(input, output, session) {
 
   # Home navigation
   observeEvent(input$go_items, nav_select("main_nav", "Items"))
-  observeEvent(input$go_scales, nav_select("main_nav", "Scales"))
-  observeEvent(input$go_categories, nav_select("main_nav", "Categories"))
-  observeEvent(input$go_questionnaires, nav_select("main_nav", "Questionnaires"))
+  observeEvent(input$go_scales, nav_select("main_nav", "Derived Variables"))
+  observeEvent(input$go_categories, nav_select("main_nav", "Topics"))
+  observeEvent(input$go_questionnaires, nav_select("main_nav", "Instruments"))
 
   # Item filters
   output$filter_study_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$study))); selectInput("filter_study_items", "Study", choices = c("All", choices)) })
   output$filter_year_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$year))); selectInput("filter_year_items", "Year", choices = c("All", choices)) })
   output$filter_cycle_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$cycle))); selectInput("filter_cycle_items", "Cycle", choices = c("All", choices)) })
-  output$filter_population_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$population))); selectInput("filter_population_items", "Target", choices = c("All", choices)) })
+  output$filter_population_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$population))); selectInput("filter_population_items", "Population", choices = c("All", choices)) })
+  output$filter_target_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$target))); selectInput("filter_target_items", "Target grade", choices = c("All", choices)) })
   output$filter_instrument_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$instrument))); selectInput("filter_instrument_items", "Instrument", choices = c("All", choices)) })
   output$filter_scale_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$scale))); selectInput("filter_scale_items", "Scale", choices = c("All", choices)) })
   output$filter_type_items_ui <- renderUI({ choices <- sort(unique(na.omit(items_data()$item_type))); selectInput("filter_type_items", "Item type", choices = c("All", choices)) })
@@ -1020,6 +1084,7 @@ server <- function(input, output, session) {
     if (!is.null(input$filter_year_items) && input$filter_year_items != "All") df <- df %>% filter(year == input$filter_year_items)
     if (!is.null(input$filter_cycle_items) && input$filter_cycle_items != "All") df <- df %>% filter(cycle == input$filter_cycle_items)
     if (!is.null(input$filter_population_items) && input$filter_population_items != "All") df <- df %>% filter(population == input$filter_population_items)
+    if (!is.null(input$filter_target_items) && input$filter_target_items != "All") df <- df %>% filter(target == input$filter_target_items)
     if (!is.null(input$filter_instrument_items) && input$filter_instrument_items != "All") df <- df %>% filter(instrument == input$filter_instrument_items)
     if (!is.null(input$filter_scale_items) && input$filter_scale_items != "All") df <- df %>% filter(scale == input$filter_scale_items)
     if (!is.null(input$filter_type_items) && input$filter_type_items != "All") df <- df %>% filter(item_type == input$filter_type_items)
@@ -1030,7 +1095,8 @@ server <- function(input, output, session) {
         grepl(q, tolower(item_code), fixed = TRUE) | grepl(q, tolower(item_uid), fixed = TRUE) |
           grepl(q, tolower(item_name), fixed = TRUE) | grepl(q, tolower(category_id), fixed = TRUE) |
           grepl(q, tolower(category_name), fixed = TRUE) | grepl(q, tolower(wording), fixed = TRUE) |
-          grepl(q, tolower(source_variable), fixed = TRUE) | grepl(q, tolower(scale), fixed = TRUE) |
+          grepl(q, tolower(item_code), fixed = TRUE) | grepl(q, tolower(item_admin_id), fixed = TRUE) |
+           grepl(q, tolower(source_variable), fixed = TRUE) | grepl(q, tolower(scale), fixed = TRUE) |
           grepl(q, tolower(scale_varname), fixed = TRUE) | grepl(q, tolower(section), fixed = TRUE) |
           grepl(q, tolower(dataset_label), fixed = TRUE))
     }
@@ -1053,7 +1119,7 @@ server <- function(input, output, session) {
   observeEvent(input$reset_item_filters, {
     updateSelectInput(session, "filter_study_items", selected = "All"); updateSelectInput(session, "filter_year_items", selected = "All")
     updateSelectInput(session, "filter_cycle_items", selected = "All"); updateSelectInput(session, "filter_population_items", selected = "All")
-    updateSelectInput(session, "filter_instrument_items", selected = "All"); updateSelectInput(session, "filter_scale_items", selected = "All")
+    updateSelectInput(session, "filter_target_items", selected = "All"); updateSelectInput(session, "filter_instrument_items", selected = "All"); updateSelectInput(session, "filter_scale_items", selected = "All")
     updateSelectInput(session, "filter_type_items", selected = "All"); updateSelectInput(session, "filter_puf_items", selected = "All")
     updateTextInput(session, "search_items", value = "")
   })
@@ -1062,7 +1128,8 @@ server <- function(input, output, session) {
   output$filter_study_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$study))); selectInput("filter_study_scales", "Study", choices = c("All", choices)) })
   output$filter_year_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$year))); selectInput("filter_year_scales", "Year", choices = c("All", choices)) })
   output$filter_cycle_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$cycle))); selectInput("filter_cycle_scales", "Cycle", choices = c("All", choices)) })
-  output$filter_population_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$population))); selectInput("filter_population_scales", "Target", choices = c("All", choices)) })
+  output$filter_population_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$population))); selectInput("filter_population_scales", "Population", choices = c("All", choices)) })
+  output$filter_target_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$target))); selectInput("filter_target_scales", "Target grade", choices = c("All", choices)) })
   output$filter_instrument_scales_ui <- renderUI({ choices <- sort(unique(na.omit(scale_admins_data()$instrument))); selectInput("filter_instrument_scales", "Instrument", choices = c("All", choices)) })
 
   filtered_scales <- reactive({
@@ -1071,8 +1138,10 @@ server <- function(input, output, session) {
     if (!is.null(input$filter_year_scales) && input$filter_year_scales != "All") admins <- admins %>% filter(year == input$filter_year_scales)
     if (!is.null(input$filter_cycle_scales) && input$filter_cycle_scales != "All") admins <- admins %>% filter(cycle == input$filter_cycle_scales)
     if (!is.null(input$filter_population_scales) && input$filter_population_scales != "All") admins <- admins %>% filter(population == input$filter_population_scales)
+    if (!is.null(input$filter_target_scales) && input$filter_target_scales != "All") admins <- admins %>% filter(target == input$filter_target_scales)
     if (!is.null(input$filter_instrument_scales) && input$filter_instrument_scales != "All") admins <- admins %>% filter(instrument == input$filter_instrument_scales)
     df <- scales_data() %>% filter(scale_uid %in% admins$scale_uid)
+    if (isTRUE(input$filter_scaled_only)) df <- df %>% filter(is_scaled %in% TRUE)
     if (!is.null(input$search_scales) && nzchar(input$search_scales)) {
       q <- tolower(input$search_scales)
       matching_uids <- admins %>% filter(grepl(q, tolower(scale), fixed = TRUE) | grepl(q, tolower(scale_id), fixed = TRUE) | grepl(q, tolower(scale_varname), fixed = TRUE)) %>% pull(scale_uid)
@@ -1088,7 +1157,7 @@ server <- function(input, output, session) {
       mutate(details = vapply(scale_uid, function(x) grid_details_button_for("grid_scale_details_uid", x), character(1))) %>%
       select(scale_uid, scale_name, varnames, studies, years, n_items, n_versions, details)
   })
-  output$scales_count <- renderUI(h5(paste(nrow(scales_grid()), "scales found")))
+  output$scales_count <- renderUI(h5(paste(nrow(scales_grid()), "derived variables found")))
   output$scales_table <- renderDT(datatable_scales_grid(scales_grid()))
   selected_scale_uids <- reactive(scales_grid()$scale_uid[input$scales_table_rows_selected])
   observeEvent(input$grid_add_scales, {
@@ -1103,14 +1172,15 @@ server <- function(input, output, session) {
   observeEvent(input$reset_scale_filters, {
     updateSelectInput(session, "filter_study_scales", selected = "All"); updateSelectInput(session, "filter_year_scales", selected = "All")
     updateSelectInput(session, "filter_cycle_scales", selected = "All"); updateSelectInput(session, "filter_population_scales", selected = "All")
-    updateSelectInput(session, "filter_instrument_scales", selected = "All"); updateTextInput(session, "search_scales", value = "")
+    updateSelectInput(session, "filter_target_scales", selected = "All"); updateSelectInput(session, "filter_instrument_scales", selected = "All"); updateCheckboxInput(session, "filter_scaled_only", value = FALSE); updateTextInput(session, "search_scales", value = "")
   })
 
   # Category filters / grid
   output$filter_study_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$study))); selectInput("filter_study_categories", "Study", choices = c("All", choices)) })
   output$filter_year_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$year))); selectInput("filter_year_categories", "Year", choices = c("All", choices)) })
   output$filter_cycle_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$cycle))); selectInput("filter_cycle_categories", "Cycle", choices = c("All", choices)) })
-  output$filter_population_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$population))); selectInput("filter_population_categories", "Target", choices = c("All", choices)) })
+  output$filter_population_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$population))); selectInput("filter_population_categories", "Population", choices = c("All", choices)) })
+  output$filter_target_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$target))); selectInput("filter_target_categories", "Target grade", choices = c("All", choices)) })
   output$filter_instrument_categories_ui <- renderUI({ choices <- sort(unique(na.omit(category_admins_data()$instrument))); selectInput("filter_instrument_categories", "Instrument", choices = c("All", choices)) })
 
   filtered_categories <- reactive({
@@ -1119,6 +1189,7 @@ server <- function(input, output, session) {
     if (!is.null(input$filter_year_categories) && input$filter_year_categories != "All") admins <- admins %>% filter(year == input$filter_year_categories)
     if (!is.null(input$filter_cycle_categories) && input$filter_cycle_categories != "All") admins <- admins %>% filter(cycle == input$filter_cycle_categories)
     if (!is.null(input$filter_population_categories) && input$filter_population_categories != "All") admins <- admins %>% filter(population == input$filter_population_categories)
+    if (!is.null(input$filter_target_categories) && input$filter_target_categories != "All") admins <- admins %>% filter(target == input$filter_target_categories)
     if (!is.null(input$filter_instrument_categories) && input$filter_instrument_categories != "All") admins <- admins %>% filter(instrument == input$filter_instrument_categories)
     df <- categories_data() %>% filter(category_id %in% admins$category_id)
     if (!is.null(input$search_categories) && nzchar(input$search_categories)) {
@@ -1133,7 +1204,7 @@ server <- function(input, output, session) {
       mutate(details = vapply(category_id, function(x) grid_details_button_for("grid_category_details_id", x), character(1))) %>%
       select(category_id, category_name, studies, years, n_items, details)
   })
-  output$categories_count <- renderUI(h5(paste(nrow(categories_grid()), "categories found")))
+  output$categories_count <- renderUI(h5(paste(nrow(categories_grid()), "topics found")))
   output$categories_table <- renderDT(datatable_categories_grid(categories_grid()))
   selected_category_ids <- reactive(categories_grid()$category_id[input$categories_table_rows_selected])
   observeEvent(input$grid_add_categories, {
@@ -1148,7 +1219,7 @@ server <- function(input, output, session) {
   observeEvent(input$reset_category_filters, {
     updateSelectInput(session, "filter_study_categories", selected = "All"); updateSelectInput(session, "filter_year_categories", selected = "All")
     updateSelectInput(session, "filter_cycle_categories", selected = "All"); updateSelectInput(session, "filter_population_categories", selected = "All")
-    updateSelectInput(session, "filter_instrument_categories", selected = "All"); updateTextInput(session, "search_categories", value = "")
+    updateSelectInput(session, "filter_target_categories", selected = "All"); updateSelectInput(session, "filter_instrument_categories", selected = "All"); updateTextInput(session, "search_categories", value = "")
   })
 
   # Questionnaire filters / grid
