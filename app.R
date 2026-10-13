@@ -338,22 +338,52 @@ standardize_items <- function(df) {
 # ------------------------------------------------------------
 
 get_items <- function(pool) {
-  item_admin <- tbl(pool, "item_admin")
-  admin_tbl <- tbl(pool, "admin") %>% select(admin_id, study, phase, year, instrument, target, cycle)
-  scale_items <- tbl(pool, "scale_items") %>%
-    left_join(tbl(pool, "scale_version"), by = "scale_id") %>%
-    left_join(tbl(pool, "scale"), by = "scale_uid") %>%
-    select(item_admin_pk, scale_uid, scale_var, scale_name, scale_id, scale_description, scale_varname)
-  item_tbl <- tbl(pool, "item_id") %>% select(item_uid, item_name, category_id)
-  category_tbl <- tbl(pool, "category") %>% select(category_id, category_name)
-
-  item_admin %>%
-    left_join(admin_tbl, by = "admin_id") %>%
-    left_join(scale_items, by = "item_admin_pk") %>%
-    left_join(item_tbl, by = "item_uid") %>%
-    left_join(category_tbl, by = "category_id") %>%
-    collect() %>%
-    standardize_items()
+  # Adapt the new October 2026 database contract to the Explorer's display model.
+  # Keep one row per index membership, so a single item may appear in multiple indices.
+  items <- tbl(pool, "item_admin") %>%
+    filter(is_public_itembank == TRUE) %>%
+    left_join(
+      tbl(pool, "admin") %>% select(admin_id, study, phase, year, instrument_name,
+                                   instrument_pop, target_grade, cycle_num),
+      by = "admin_id"
+    ) %>%
+    left_join(
+      tbl(pool, "item") %>% select(item_uid, item_name, topic_id),
+      by = "item_uid"
+    ) %>%
+    left_join(
+      tbl(pool, "topic") %>% select(topic_id, category_name),
+      by = "topic_id"
+    ) %>%
+    left_join(
+      tbl(pool, "index_item") %>%
+        left_join(tbl(pool, "index_version") %>% filter(is_public_itembank == TRUE),
+                  by = "index_id") %>%
+        left_join(tbl(pool, "index"), by = "index_uid") %>%
+        select(item_admin_pk, index_uid, index_var, index_name, index_id,
+               index_version_description, index_varname, is_scaled),
+      by = "item_admin_pk"
+    ) %>%
+    collect()
+  if (nrow(items) == 0) return(items)
+  items <- items %>%
+    mutate(
+      item_admin_id = item_id,
+      category_id = topic_id,
+      scale_id = index_id, scale_uid = index_uid,
+      scale_var = index_var, scale_name = index_name,
+      scale_varname = index_varname, scale_description = index_version_description,
+      instrument = instrument_name, population = instrument_pop,
+      target = target_grade, cycle = cycle_num,
+      type = response_type, puf = is_puf,
+      wording_item = coalesce(wording_item, wording_question),
+      wording_question = if_else(
+        !is.na(wording_question_add) & nzchar(wording_question_add),
+        paste(coalesce(wording_question, ""), wording_question_add, sep = " / "),
+        wording_question
+      )
+    )
+  standardize_items(items)
 }
 
 get_item_history <- function(pool, selected_item_uids) tibble()
@@ -361,16 +391,16 @@ get_item_variants <- function(pool, selected_item_uids) tibble()
 get_item_examples <- function(pool) read_table_safe(pool, "item_example")
 
 get_scale_membership <- function(pool, selected_items) {
-  df <- read_table_safe(pool, "scale_items")
+  df <- read_table_safe(pool, "index_item")
   if (nrow(df) == 0) return(tibble())
-  df %>% left_join(read_table_safe(pool, "scale_version"), by = "scale_id") %>%
+  df %>% left_join(read_table_safe(pool, "index_version"), by = "scale_id") %>%
     filter(item_admin_pk %in% selected_items$item_admin_pk)
 }
 
 get_response_options <- function(pool, selected_items) {
   selected_response_ids <- selected_items %>% filter(!is.na(response_id), response_id != "") %>% distinct(response_id) %>% pull(response_id)
   if (length(selected_response_ids) == 0) return(tibble())
-  response_values <- read_table_safe(pool, "value_scheme_value")
+  response_values <- read_table_safe(pool, "response_scheme_values")
   if (nrow(response_values) == 0) return(tibble())
   if (!"response_id" %in% names(response_values)) return(response_values)
   response_values %>% filter(response_id %in% selected_response_ids)
@@ -379,7 +409,7 @@ get_response_options <- function(pool, selected_items) {
 get_missing_values <- function(pool, selected_items) {
   selected_miss_ids <- selected_items %>% filter(!is.na(miss_id), miss_id != "") %>% distinct(miss_id) %>% pull(miss_id)
   if (length(selected_miss_ids) == 0) return(tibble())
-  miss_values <- read_table_safe(pool, "miss_scheme_value")
+  miss_values <- read_table_safe(pool, "miss_scheme_values")
   if (nrow(miss_values) == 0) return(tibble())
   if (!"miss_id" %in% names(miss_values)) return(miss_values)
   miss_values %>% filter(miss_id %in% selected_miss_ids)
