@@ -992,7 +992,7 @@ server <- function(input, output, session) {
 
   # Modal outputs
   output$item_variants_table <- renderDT({
-    datatable_variants(modal_item_versions() %>% mutate(pop_instrument = paste0(population, instrument)) %>%
+    datatable_variants(modal_item_versions() %>% mutate(pop_instrument = population) %>%
                          select(item_admin_id, study, year, pop_instrument, source_variable, scale_varnames, examples))
   })
   output$item_version_matrix <- renderUI(version_matrix_ui(derive_item_version_matrix(modal_item_versions())))
@@ -1023,7 +1023,7 @@ server <- function(input, output, session) {
   })
   output$category_composition_matrix <- renderUI(version_matrix_ui(modal_category_composition(), row_label = "Item UID"))
   output$scale_versions_table <- renderDT({
-    datatable_simple(modal_scale_admins() %>% mutate(pop_instrument = paste0(population, instrument)) %>%
+    datatable_simple(modal_scale_admins() %>% mutate(pop_instrument = population) %>%
                        select(scale_var, scale_id, scale_varname, scale, study, year, pop_instrument))
   })
   output$scale_composition_matrix <- renderUI(version_matrix_ui(modal_scale_composition(), row_label = "Item UID"))
