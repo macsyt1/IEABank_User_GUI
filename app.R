@@ -1024,7 +1024,13 @@ server <- function(input, output, session) {
   output$category_composition_matrix <- renderUI(version_matrix_ui(modal_category_composition(), row_label = "Item UID"))
   output$scale_versions_table <- renderDT({
     datatable_simple(modal_scale_admins() %>% mutate(pop_instrument = population) %>%
-                       select(scale_var, scale_id, scale_varname, scale, study, year, pop_instrument))
+                       select(`Version` = scale_var,
+                              `Version ID` = scale_id,
+                              `Variable` = scale_varname,
+                              `Derived variable` = scale,
+                              `Study` = study,
+                              `Year` = year,
+                              `Population` = pop_instrument))
   })
   output$scale_composition_matrix <- renderUI(version_matrix_ui(modal_scale_composition(), row_label = "Item UID"))
   output$scale_items_table <- renderDT({
