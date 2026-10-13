@@ -679,21 +679,21 @@ main_ui <- function() page_navbar(
     "Home",
     div(
       class = "home-hero",
-      h1("Explore questionnaire items across studies and cycles"),
+      h1("Explore questionnaire items across studies, cycles and scales"),
       p(class = "lead text-muted", "Search, compare and export item metadata from IEA studies."),
       div(
         class = "mt-3",
         actionButton("go_items", "Explore items", class = "btn btn-primary"),
-        actionButton("go_scales", "Browse derived variables", class = "btn btn-outline-primary"),
-        actionButton("go_categories", "Browse topics", class = "btn btn-outline-primary"),
-        actionButton("go_questionnaires", "Browse instruments", class = "btn btn-outline-primary")
+        actionButton("go_scales", "Browse scales", class = "btn btn-outline-primary"),
+        actionButton("go_categories", "Browse categories", class = "btn btn-outline-primary"),
+        actionButton("go_questionnaires", "Browse questionnaires", class = "btn btn-outline-primary")
       )
     ),
     layout_columns(
       col_widths = c(4, 4, 4),
       card(class = "home-card", card_body(h4("Items"), p("Search individual items, wording, response options and metadata."), span(class = "badge rounded-pill text-bg-light", "Item-level"))),
-      card(class = "home-card", card_body(h4("Derived Variables"), p("Browse constructs and groups of items across cycles."), span(class = "badge rounded-pill text-bg-light", "Derived-variable level"))),
-      card(class = "home-card", card_body(h4("Instruments"), p("Explore complete instruments, sections and questionnaire structures."), span(class = "badge rounded-pill text-bg-light", "Instrument-level")))
+      card(class = "home-card", card_body(h4("Scales"), p("Browse constructs and groups of items across cycles."), span(class = "badge rounded-pill text-bg-light", "Scale-level"))),
+      card(class = "home-card", card_body(h4("Questionnaires"), p("Explore complete instruments, sections and questionnaire structures."), span(class = "badge rounded-pill text-bg-light", "Instrument-level")))
     )
   ),
 
