@@ -803,9 +803,9 @@ main_ui <- function() page_navbar(
     )
   ),
 
-  nav_panel("Glossary", div(class="iea-doc-page", shiny::includeMarkdown("content/glossary.md"))),
-  nav_panel("Tutorial", div(class="iea-doc-page", shiny::includeMarkdown("content/tutorial.md"))),
-  nav_panel("Latest News", div(class="iea-doc-page", shiny::includeMarkdown("content/latest-news.md"))),
+  nav_panel("Glossary", div(class="iea-doc-page", shiny::markdown(paste(readLines("content/glossary.md", warn = FALSE, encoding = "UTF-8"), collapse = "\n")))),
+  nav_panel("Tutorial", div(class="iea-doc-page", shiny::markdown(paste(readLines("content/tutorial.md", warn = FALSE, encoding = "UTF-8"), collapse = "\n")))),
+  nav_panel("Latest News", div(class="iea-doc-page", shiny::markdown(paste(readLines("content/latest-news.md", warn = FALSE, encoding = "UTF-8"), collapse = "\n")))),
 
   nav_panel(
     "Export Selection",
