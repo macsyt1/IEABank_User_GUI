@@ -29,7 +29,7 @@ options(shiny.maxRequestSize = 6 * 1024^2)
 # ------------------------------------------------------------
 # App version
 # ------------------------------------------------------------
-APP_VERSION <- "0.3.3"
+APP_VERSION <- "0.3.4"
 
 # ------------------------------------------------------------
 # Institutional colors
@@ -879,7 +879,7 @@ server <- function(input, output, session) {
       textAreaInput("feedback_description","Description",rows=5),
       fileInput("feedback_image","Screenshot (optional, PNG or JPG; up to 5 MB)",accept=c(".png",".jpg",".jpeg","image/png","image/jpeg")),
       textInput("feedback_email","Email (optional)"),
-      p(class="text-muted","Please do not include personal or confidential data. Reports are reviewed privately before publication."),
+      p(class="text-muted","Please do not include personal or confidential data. Reports are published automatically to GitHub Issues. Screenshots and contact emails remain private."),
       footer=tagList(modalButton("Cancel"),actionButton("submit_feedback","Submit report",class="btn-primary"))
     ))
   })
@@ -908,18 +908,64 @@ server <- function(input, output, session) {
       mime<-if(png)"image/png" else "image/jpeg"
       hex<-paste(sprintf("%02x",as.integer(raw)),collapse="")
     }
-    result<-tryCatch({
-      sql<-paste0("INSERT INTO public.feedback_reports (report_type,section,title,description,contact_email,screenshot,screenshot_mime) VALUES ($1,$2,$3,$4,$5,",if(is.null(hex))"NULL" else "decode($6,'hex')",",",if(is.null(hex))"NULL" else "$7",")")
-      vals<-list(input$feedback_type,input$feedback_section,title,detail,if(nzchar(email))email else NA_character_)
-      if(!is.null(hex))vals<-c(vals,list(hex,mime))
+    # One-time capability: only the submitting session can link its own report.
+    publish_key <- paste(sprintf("%02x",as.integer(openssl::rand_bytes(24))),collapse="")
+    stored <- tryCatch({
+      sql <- paste0(
+        "INSERT INTO public.feedback_reports (report_type,section,title,description,contact_email,screenshot,screenshot_mime,publish_key) ",
+        "VALUES ($1,$2,$3,$4,$5,",if(is.null(hex)) "NULL" else "decode($6,'hex')",",",
+        if(is.null(hex)) "NULL" else "$7",",",
+        if(is.null(hex)) "$6" else "$8",")")
+      vals <- list(input$feedback_type,input$feedback_section,title,detail,
+                   if(nzchar(email)) email else NA_character_)
+      if(!is.null(hex)) vals <- c(vals,list(hex,mime))
+      vals <- c(vals,list(publish_key))
       DBI::dbExecute(pool,sql,params=vals)
       TRUE
-    },error=function(e){message("Feedback submission error: ",conditionMessage(e));FALSE})
-    if(result){
-      feedback_cooldown(Sys.time())
-      removeModal()
-      showNotification("Report received. Thank you! The team will review it.",type="message",duration=7)
-    }else showNotification("Your report could not be submitted. Please try again later.",type="error")
+    },error=function(e){message("Feedback storage error: ",conditionMessage(e));FALSE})
+    if(!stored){
+      showNotification("Your report could not be saved. Please try again later.",type="error")
+      return()
+    }
+    feedback_cooldown(Sys.time())
+    removeModal()
+    token <- Sys.getenv("GITHUB_ISSUES_TOKEN")
+    if(!nzchar(token)){
+      message("GITHUB_ISSUES_TOKEN is not configured on public app.")
+      showNotification("Report saved, but GitHub publication is not yet configured.",type="warning",duration=8)
+      return()
+    }
+    # Never publish screenshot bytes or optional reporter contact details.
+    gh_body <- paste0("**Type:** ",input$feedback_type,
+       "\\n**Section:** ",input$feedback_section,
+       "\\n**Source:** IEA Item Bank Explorer feedback form\\n\\n",
+       detail, "\\n\\n_Automatically submitted. Screenshot (if any) is stored privately._")
+    issue_url <- tryCatch({
+      response <- httr2::request("https://api.github.com/repos/macsyt1/IEABank_User_GUI/issues") |>
+        httr2::req_method("POST") |>
+        httr2::req_headers(Authorization=paste("Bearer",token),
+          Accept="application/vnd.github+json",
+          `X-GitHub-Api-Version`="2022-11-28") |>
+        httr2::req_body_json(list(title=paste0("[IEABank] ",title),body=gh_body,
+                                  labels=list("user-feedback"))) |>
+        httr2::req_perform()
+      httr2::resp_body_json(response)$html_url
+    },error=function(e){message("Automatic GitHub publication error: ",conditionMessage(e));NULL})
+    if(is.null(issue_url)){
+      showNotification("Report saved, but automatic GitHub publication failed.",type="warning",duration=8)
+      return()
+    }
+    linked <- tryCatch({
+      x <- DBI::dbGetQuery(pool,
+        "SELECT public.mark_feedback_published($1,$2) AS ok",
+        params=list(publish_key,issue_url))
+      isTRUE(x$ok[[1]])
+    },error=function(e){message("GitHub publication linking error: ",conditionMessage(e));FALSE})
+    if(linked){
+      showNotification("Report published to GitHub Issues. Thank you!",type="message",duration=8)
+    }else{
+      showNotification("GitHub issue created, but the report status could not be synchronized.",type="warning",duration=8)
+    }
   })
 
   # Data
