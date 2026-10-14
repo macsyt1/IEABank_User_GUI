@@ -2,6 +2,7 @@ name: R source syntax
 on:
   push:
     branches:
+      - main
       - feature/ieabank-2026-10-model-gui
   pull_request:
   workflow_dispatch:
