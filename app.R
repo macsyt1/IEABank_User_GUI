@@ -568,7 +568,8 @@ app_footer <- div(
   div(
     class = "app-footer-inner",
     div(class = "footer-line footer-version", tags$span(HTML("<strong>IEA Item Bank Explorer</strong> · Version ")),
-        actionLink(inputId = "version_click", label = APP_VERSION, class = "version-easter-egg")),
+        actionLink(inputId = "version_click", label = APP_VERSION, class = "version-easter-egg"),
+        tags$span(" · "),actionLink(inputId="open_feedback_footer",label="Report an issue")),
     div(class = "footer-line footer-copyright",
         HTML("&copy; IEA, 2026 · International Association for the Evaluation of Educational Achievement"))
   )
@@ -865,7 +866,7 @@ server <- function(input, output, session) {
   observeEvent(input$go_news, nav_select("main_nav", "Latest News"))
 
   feedback_cooldown <- reactiveVal(as.POSIXct("1970-01-01", tz="UTC"))
-  observeEvent(input$open_feedback_home, {
+  observeEvent({input$open_feedback_home; input$open_feedback_footer}, {
     showModal(modalDialog(
       title="Report an issue", size="m", easyClose=TRUE,
       selectInput("feedback_type","Report type",choices=c("Bug"="bug","Incorrect information"="data","Suggestion"="suggestion")),
