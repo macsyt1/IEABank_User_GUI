@@ -27,4 +27,4 @@ Select rows and choose **+ Add selected**, or add an item or version from a Deta
 
 ## Report a problem
 
-Use **Report an issue** if you encounter broken functionality, incorrect information or have an improvement suggestion. You may include one PNG/JPEG screenshot (up to 5 MB). Reports are reviewed privately before an issue is published on GitHub. Do not include student data or confidential information in the screenshot.
+Use **Report an issue** if you encounter broken functionality, incorrect information or have an improvement suggestion. You may include one PNG/JPEG screenshot (up to 5 MB). Reports are submitted automatically as GitHub issues. Screenshots and optional contact email are stored privately and are not published to GitHub. Do not include student data or confidential information in the screenshot.
