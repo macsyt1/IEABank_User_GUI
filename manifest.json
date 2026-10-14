@@ -2561,7 +2561,7 @@
       "checksum": "bfc93f6c06d5c4aa5dc545a08eefbdf5"
     },
     "app.R": {
-      "checksum": "d08a69fe9615285222e4ee45574e514f"
+      "checksum": "adf6701ded12c61eb87d622132c7783f"
     },
     "app_old.R": {
       "checksum": "d57afcec8cedeb0f645a40b7cfa5b11f"
@@ -2580,6 +2580,18 @@
     },
     "www/iea_logo.png": {
       "checksum": "89fb89be975b9b8a9601da6cdab8400e"
+    },
+    "content/homepage.md": {
+      "checksum": "7b67ff31553bf2db34a4314bf39d18d0"
+    },
+    "content/glossary.md": {
+      "checksum": "8c891f0b61f64070dcc5d79786fa34a9"
+    },
+    "content/tutorial.md": {
+      "checksum": "4e0f247eb4429a841f24d186fbf854a0"
+    },
+    "content/latest-news.md": {
+      "checksum": "b43e9cf381b867ed68199e9fed2532e4"
     }
   },
   "users": null
