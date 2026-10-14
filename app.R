@@ -22,6 +22,10 @@ library(DT)
 library(openxlsx)
 library(httr2)
 
+# Permit a 5 MiB screenshot plus multipart form overhead; enforce the actual
+# 5 MiB file limit in the feedback handler.
+options(shiny.maxRequestSize = 6 * 1024^2)
+
 # ------------------------------------------------------------
 # App version
 # ------------------------------------------------------------
