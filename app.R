@@ -716,7 +716,7 @@ main_ui <- function() page_navbar(
       ),
       div(class="iea-home-feedback",
         div(h5(icon("comment-dots")," Found an issue or have a suggestion?"),
-            p("Report a bug, incorrect information or an improvement. Reports are reviewed before publication."),
+            p("Report a bug, incorrect information or an improvement. Reports are published automatically to GitHub Issues."),
             actionButton("open_feedback_home","Report an issue",class="btn-primary"))),
       div(class="iea-home-legal",
         h5(icon("shield-alt")," Important: Reproducing IEA assessment materials"),
@@ -870,7 +870,7 @@ server <- function(input, output, session) {
   observeEvent(input$go_news, nav_select("main_nav", "Latest News"))
 
   feedback_cooldown <- reactiveVal(as.POSIXct("1970-01-01", tz="UTC"))
-  observeEvent({input$open_feedback_home; input$open_feedback_footer}, {
+  observeEvent(list(input$open_feedback_home, input$open_feedback_footer), {
     showModal(modalDialog(
       title="Report an issue", size="m", easyClose=TRUE,
       selectInput("feedback_type","Report type",choices=c("Bug"="bug","Incorrect information"="data","Suggestion"="suggestion")),
