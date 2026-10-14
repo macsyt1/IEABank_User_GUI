@@ -958,10 +958,18 @@ server <- function(input, output, session) {
       return()
     }
     # Never publish screenshot bytes or optional reporter contact details.
-    gh_body <- paste0("**Type:** ",input$feedback_type,
-       "\\n**Section:** ",input$feedback_section,
-       "\\n**Source:** IEA Item Bank Explorer feedback form\\n\\n",
-       detail, "\\n\\n_Automatically submitted. Screenshot (if any) is stored privately._")
+    gh_body <- paste0(
+      "## Report details\n\n",
+      "| Field | Value |\n| --- | --- |\n",
+      "| Type | ", input$feedback_type, " |\n",
+      "| Section | ", gsub("|", "&#124;", input$feedback_section, fixed=TRUE), " |\n",
+      "| Source | IEA Item Bank Explorer |\n\n",
+      "## Description\n\n",
+      detail, "\n\n",
+      "---\n",
+      "_Automatically submitted through the IEABank feedback form. ",
+      "Optional contact information and screenshots are stored privately and are not published._"
+    )
     issue_url <- tryCatch({
       response <- httr2::request("https://api.github.com/repos/macsyt1/IEABank_User_GUI/issues") |>
         httr2::req_method("POST") |>
