@@ -718,9 +718,14 @@ main_ui <- function() page_navbar(
         div(h5(icon("comment-dots")," Found an issue or have a suggestion?"),
             p("Report a bug, incorrect information or an improvement. Reports are published automatically to GitHub Issues."),
             actionButton("open_feedback_home","Report an issue",class="btn-primary"))),
-      div(class="iea-home-legal",
-        h5(icon("shield-alt")," Important: Reproducing IEA assessment materials"),
-        p("Reproducing or translating IEA materials may require prior written approval. Consult the IEA study materials guidance before reuse."))
+      div(class = "iea-home-legal",
+            h5(icon("shield-alt"), " Important: Reproducing IEA assessment materials"),
+            p("Anyone seeking permission to reuse, reproduce, or translate IEA material must receive written approval from IEA. Full details can be found in the ",
+              tags$a(href = "https://www.iea.nl/node/4111",
+              target = "_blank",
+              rel = "noopener noreferrer",
+              "using study materials guide"),
+            ", including information on how to complete and submit a permission."))
     )
   ),
 
