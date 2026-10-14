@@ -594,9 +594,9 @@ main_ui <- function() page_navbar(
   header = tags$head(
     tags$style(HTML("
       /* Keep help/news pages accessible through Home links, not the main navbar. */
-      .navbar-nav li:has(> a.nav-link[data-value="Glossary"]),
-      .navbar-nav li:has(> a.nav-link[data-value="Tutorial"]),
-      .navbar-nav li:has(> a.nav-link[data-value="Latest News"]) { display:none !important; }
+      .navbar-nav li:has(> a.nav-link[data-value=\"Glossary\"]),
+      .navbar-nav li:has(> a.nav-link[data-value=\"Tutorial\"]),
+      .navbar-nav li:has(> a.nav-link[data-value=\"Latest News\"]) { display:none !important; }
       :root { --iea-blue:#0070b8; --iea-red:#e2211c; --iea-bg:#F7F9FC; --iea-border:#E5E7EB; --iea-text:#1F2937; --iea-muted:#6B7280; }
       html, body { min-height:100%; }
       body { background-color:var(--iea-bg); color:var(--iea-text); overflow-x:hidden; }
