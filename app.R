@@ -946,8 +946,7 @@ server <- function(input, output, session) {
         httr2::req_headers(Authorization=paste("Bearer",token),
           Accept="application/vnd.github+json",
           `X-GitHub-Api-Version`="2022-11-28") |>
-        httr2::req_body_json(list(title=paste0("[IEABank] ",title),body=gh_body,
-                                  labels=list("user-feedback"))) |>
+        httr2::req_body_json(list(title=paste0("[IEABank] ",title),body=gh_body)) |>
         httr2::req_perform()
       httr2::resp_body_json(response)$html_url
     },error=function(e){message("Automatic GitHub publication error: ",conditionMessage(e));NULL})
