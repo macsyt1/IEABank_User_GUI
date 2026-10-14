@@ -681,25 +681,41 @@ main_ui <- function() page_navbar(
     "))
   ),
 
+  tags$style(HTML("\n.iea-home {max-width:1260px;margin:auto;padding:24px 0 34px;color:#55585a;}\n.iea-home-intro {border-left:4px solid #d91a15;padding:8px 0 10px 19px;margin-bottom:27px;}\n.iea-home-intro h1 {font-size:clamp(1.55rem,2.5vw,2.3rem);font-weight:750;margin:0 0 10px;}\n.iea-home-intro p {color:#55585a;margin:0;}\n.iea-home-label {font-size:.85rem;letter-spacing:.09em;color:#55585a;font-weight:700;margin-bottom:14px;}\n.iea-home-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}\n.iea-home-link.btn {min-height:145px;white-space:normal;text-align:left;background:white;color:#55585a;border:1px solid #dfe4e8;border-radius:15px;padding:19px;display:flex;flex-direction:column;align-items:flex-start;gap:9px;box-shadow:0 2px 8px #00000009;}\n.iea-home-link.btn:hover,.iea-home-link.btn:focus {border-color:#0071b9;box-shadow:0 6px 18px #0071b91f;background:#fff;color:#55585a;}\n.iea-home-link i {color:#0071b9;font-size:1.35rem;}\n.iea-home-link strong {font-size:1.12rem;}\n.iea-home-link span {font-size:.88rem;line-height:1.45;}\n.iea-home-note,.iea-home-tile,.iea-home-feedback,.iea-home-legal {border:1px solid #dfe4e8;border-radius:15px;padding:19px;margin-bottom:14px;background:white;}\n.iea-home-note {background:#f6f7f8;}\n.iea-home-tile a {color:#0071b9;font-weight:650;}\n.iea-home-feedback {margin-top:18px;display:flex;justify-content:space-between;align-items:center;gap:24px;}\n.iea-home-feedback .btn {background:#0071b9;border-color:#0071b9;flex-shrink:0;}\n.iea-home-legal {background:#f6f7f8;}\n.iea-home-legal h5,.iea-home-feedback h5 {font-size:1.08rem;}\n.iea-doc-page {max-width:1120px;margin:28px auto;padding:24px 34px;background:white;border:1px solid #e4e8eb;border-radius:14px;}\n.iea-doc-page table {width:100%;margin:15px 0;border-collapse:collapse;}\n.iea-doc-page th,.iea-doc-page td {border-bottom:1px solid #e0e4e7;padding:9px 12px;text-align:left;}\n.iea-doc-page a {color:#0071b9;}\n@media(max-width:900px){.iea-home-grid{grid-template-columns:1fr}.iea-home-feedback{display:block}.iea-home-feedback .btn{margin-top:8px}}\n")),
   nav_panel(
     "Home",
-    div(
-      class = "home-hero",
-      h1("Explore questionnaire items across studies, cycles and scales"),
-      p(class = "lead text-muted", "Search, compare and export item metadata from IEA studies."),
-      div(
-        class = "mt-3",
-        actionButton("go_items", "Explore items", class = "btn btn-primary"),
-        actionButton("go_scales", "Browse scales", class = "btn btn-outline-primary"),
-        actionButton("go_categories", "Browse categories", class = "btn btn-outline-primary"),
-        actionButton("go_questionnaires", "Browse questionnaires", class = "btn btn-outline-primary")
-      )
-    ),
-    layout_columns(
-      col_widths = c(4, 4, 4),
-      card(class = "home-card", card_body(h4("Items"), p("Search individual items, wording, response options and metadata."), span(class = "badge rounded-pill text-bg-light", "Item-level"))),
-      card(class = "home-card", card_body(h4("Scales"), p("Browse constructs and groups of items across cycles."), span(class = "badge rounded-pill text-bg-light", "Scale-level"))),
-      card(class = "home-card", card_body(h4("Questionnaires"), p("Explore complete instruments, sections and questionnaire structures."), span(class = "badge rounded-pill text-bg-light", "Instrument-level")))
+    div(class="iea-home",
+      div(class="iea-home-intro",
+        h1("Explore questionnaire items across studies and cycles"),
+        p("Search, review, compare, and export questionnaire item metadata from IEA studies.")),
+      layout_columns(col_widths=c(7,5),
+        div(
+          h5(class="iea-home-label","EXPLORE THE ITEM BANK"),
+          div(class="iea-home-grid",
+            actionButton("go_items",tagList(icon("list"),strong("Items"),span("Search questionnaire items and their versions.")),class="iea-home-link"),
+            actionButton("go_categories",tagList(icon("tags"),strong("Topics"),span("Browse questionnaire content by theme.")),class="iea-home-link"),
+            actionButton("go_scales",tagList(icon("chart-line"),strong("Derived Variables"),span("Explore indices and construct scales.")),class="iea-home-link"),
+            actionButton("go_questionnaires",tagList(icon("book-open"),strong("Instruments"),span("Explore available questionnaires.")),class="iea-home-link")
+          )
+        ),
+        div(
+          h5(class="iea-home-label","INFORMATION & HELP"),
+          div(class="iea-home-note",strong("Alpha version"),p("The IEA Item Bank is under development. Additional studies and cycles will be added.")),
+          div(class="iea-home-tile",h5("How to use the IEA Item Bank"),
+            p("Learn to search, review versions, and export information."),
+            actionLink("go_tutorial","Tutorial →"),span("  ·  "),actionLink("go_glossary","Glossary →")),
+          div(class="iea-home-tile",h5("Latest news"),
+            p("Recent changes, improvements and announcements."),
+            actionLink("go_news","View latest news →"))
+        )
+      ),
+      div(class="iea-home-feedback",
+        div(h5(icon("comment-dots")," Found an issue or have a suggestion?"),
+            p("Report a bug, incorrect information or an improvement. Reports are reviewed before publication."),
+            actionButton("open_feedback_home","Report an issue",class="btn-primary"))),
+      div(class="iea-home-legal",
+        h5(icon("shield-alt")," Important: Reproducing IEA assessment materials"),
+        p("Reproducing or translating IEA materials may require prior written approval. Consult the IEA study materials guidance before reuse."))
     )
   ),
 
@@ -782,18 +798,9 @@ main_ui <- function() page_navbar(
     )
   ),
 
-  nav_panel("Glossary",
-    page_header("Glossary", "Definitions and documentation will be added here."),
-    p("Work in progress.")
-  ),
-  nav_panel("Tutorial",
-    page_header("How to Use the IEA Item Bank", "Step-by-step guidance will be added here."),
-    p("Work in progress.")
-  ),
-  nav_panel("Latest News",
-    page_header("Latest News", "Project updates and changelog."),
-    p("Work in progress.")
-  ),
+  nav_panel("Glossary", div(class="iea-doc-page", shiny::includeMarkdown("content/glossary.md"))),
+  nav_panel("Tutorial", div(class="iea-doc-page", shiny::includeMarkdown("content/tutorial.md"))),
+  nav_panel("Latest News", div(class="iea-doc-page", shiny::includeMarkdown("content/latest-news.md"))),
 
   nav_panel(
     "Export Selection",
@@ -851,6 +858,63 @@ server <- function(input, output, session) {
     if (nrow(profile) != 1) { login_error("This account has no IEABank profile."); return() }
     if (!isTRUE(profile$active[1])) { login_error("This account is inactive. Contact an administrator."); return() }
     current_user(as.list(profile[1, ]))
+  })
+
+  observeEvent(input$go_tutorial, nav_select("main_nav", "Tutorial"))
+  observeEvent(input$go_glossary, nav_select("main_nav", "Glossary"))
+  observeEvent(input$go_news, nav_select("main_nav", "Latest News"))
+
+  feedback_cooldown <- reactiveVal(as.POSIXct("1970-01-01", tz="UTC"))
+  observeEvent(input$open_feedback_home, {
+    showModal(modalDialog(
+      title="Report an issue", size="m", easyClose=TRUE,
+      selectInput("feedback_type","Report type",choices=c("Bug"="bug","Incorrect information"="data","Suggestion"="suggestion")),
+      selectInput("feedback_section","Section",choices=c("Home","Items","Topics","Derived Variables","Instruments","Export Selection","Tutorial","Glossary","Latest News","Other")),
+      textInput("feedback_title","Title"),
+      textAreaInput("feedback_description","Description",rows=5),
+      fileInput("feedback_image","Screenshot (optional, PNG or JPG; up to 5 MB)",accept=c(".png",".jpg",".jpeg","image/png","image/jpeg")),
+      textInput("feedback_email","Email (optional)"),
+      p(class="text-muted","Please do not include personal or confidential data. Reports are reviewed privately before publication."),
+      footer=tagList(modalButton("Cancel"),actionButton("submit_feedback","Submit report",class="btn-primary"))
+    ))
+  })
+  observeEvent(input$submit_feedback,{
+    if(as.numeric(difftime(Sys.time(),feedback_cooldown(),units="secs")) < 60){
+      showNotification("Please wait before submitting another report.",type="warning");return()
+    }
+    title<-trimws(input$feedback_title %||% "")
+    detail<-trimws(input$feedback_description %||% "")
+    email<-trimws(input$feedback_email %||% "")
+    if(nchar(title)<5||nchar(title)>180||nchar(detail)<10||nchar(detail)>5000){
+      showNotification("Title must contain 5–180 characters and description 10–5000.",type="error");return()
+    }
+    if(nzchar(email)&&(!grepl("^[^@ ]+@[^@ ]+\\.[^@ ]+$",email)||nchar(email)>254)){
+      showNotification("Enter a valid email or leave it empty.",type="error");return()
+    }
+    f<-input$feedback_image
+    mime<-NA_character_
+    hex<-NULL
+    if(!is.null(f)){
+      if(f$size>5242880){showNotification("Maximum screenshot size is 5 MB.",type="error");return()}
+      raw<-readBin(f$datapath,what="raw",n=5242881)
+      png<-length(raw)>=8 && identical(as.integer(raw[1:8]),c(137L,80L,78L,71L,13L,10L,26L,10L))
+      jpg<-length(raw)>=3 && identical(as.integer(raw[1:3]),c(255L,216L,255L))
+      if(!(png||jpg)){showNotification("Only valid PNG or JPEG screenshots are accepted.",type="error");return()}
+      mime<-if(png)"image/png" else "image/jpeg"
+      hex<-paste(sprintf("%02x",as.integer(raw)),collapse="")
+    }
+    result<-tryCatch({
+      sql<-paste0("INSERT INTO public.feedback_reports (report_type,section,title,description,contact_email,screenshot,screenshot_mime) VALUES ($1,$2,$3,$4,$5,",if(is.null(hex))"NULL" else "decode($6,'hex')",",",if(is.null(hex))"NULL" else "$7",")")
+      vals<-list(input$feedback_type,input$feedback_section,title,detail,if(nzchar(email))email else NA_character_)
+      if(!is.null(hex))vals<-c(vals,list(hex,mime))
+      DBI::dbExecute(pool,sql,params=vals)
+      TRUE
+    },error=function(e){message("Feedback submission error: ",conditionMessage(e));FALSE})
+    if(result){
+      feedback_cooldown(Sys.time())
+      removeModal()
+      showNotification("Report received. Thank you! The team will review it.",type="message",duration=7)
+    }else showNotification("Your report could not be submitted. Please try again later.",type="error")
   })
 
   # Data
