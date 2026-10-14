@@ -593,6 +593,10 @@ main_ui <- function() page_navbar(
   id = "main_nav", title = app_brand, theme = app_theme, fillable = FALSE, footer = app_footer,
   header = tags$head(
     tags$style(HTML("
+      /* Keep help/news pages accessible through Home links, not the main navbar. */
+      .navbar-nav li:has(> a.nav-link[data-value="Glossary"]),
+      .navbar-nav li:has(> a.nav-link[data-value="Tutorial"]),
+      .navbar-nav li:has(> a.nav-link[data-value="Latest News"]) { display:none !important; }
       :root { --iea-blue:#0070b8; --iea-red:#e2211c; --iea-bg:#F7F9FC; --iea-border:#E5E7EB; --iea-text:#1F2937; --iea-muted:#6B7280; }
       html, body { min-height:100%; }
       body { background-color:var(--iea-bg); color:var(--iea-text); overflow-x:hidden; }
@@ -875,7 +879,7 @@ server <- function(input, output, session) {
   observeEvent(input$go_news, nav_select("main_nav", "Latest News"))
 
   feedback_cooldown <- reactiveVal(as.POSIXct("1970-01-01", tz="UTC"))
-  observeEvent(list(input$open_feedback_home, input$open_feedback_footer), {
+  observeEvent(input$open_feedback_home, {
     showModal(modalDialog(
       title="Report an issue", size="m", easyClose=TRUE,
       selectInput("feedback_type","Report type",choices=c("Bug"="bug","Incorrect information"="data","Suggestion"="suggestion")),
@@ -887,7 +891,20 @@ server <- function(input, output, session) {
       p(class="text-muted","Please do not include personal or confidential data. Reports are published automatically to GitHub Issues. Screenshots and contact emails remain private."),
       footer=tagList(modalButton("Cancel"),actionButton("submit_feedback","Submit report",class="btn-primary"))
     ))
-  })
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  observeEvent(input$open_feedback_footer, {
+    showModal(modalDialog(
+      title="Report an issue", size="m", easyClose=TRUE,
+      selectInput("feedback_type","Report type",choices=c("Bug"="bug","Incorrect information"="data","Suggestion"="suggestion")),
+      selectInput("feedback_section","Section",choices=c("Home","Items","Topics","Derived Variables","Instruments","Export Selection","Tutorial","Glossary","Latest News","Other")),
+      textInput("feedback_title","Title"),
+      textAreaInput("feedback_description","Description",rows=5),
+      fileInput("feedback_image","Screenshot (optional, PNG or JPG; up to 5 MB)",accept=c(".png",".jpg",".jpeg","image/png","image/jpeg")),
+      textInput("feedback_email","Email (optional)"),
+      p(class="text-muted","Please do not include personal or confidential data. Reports are published automatically to GitHub Issues. Screenshots and contact emails remain private."),
+      footer=tagList(modalButton("Cancel"),actionButton("submit_feedback","Submit report",class="btn-primary"))
+    ))
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
   observeEvent(input$submit_feedback,{
     if(as.numeric(difftime(Sys.time(),feedback_cooldown(),units="secs")) < 60){
       showNotification("Please wait before submitting another report.",type="warning");return()
