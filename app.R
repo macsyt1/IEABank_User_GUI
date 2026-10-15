@@ -29,7 +29,7 @@ options(shiny.maxRequestSize = 6 * 1024^2)
 # ------------------------------------------------------------
 # App version
 # ------------------------------------------------------------
-APP_VERSION <- "0.3.4"
+APP_VERSION <- "0.3.5"
 
 # ------------------------------------------------------------
 # Institutional colors
@@ -565,7 +565,9 @@ app_brand <- div(
   class = "app-brand",
   tags$img(src = "iea_logo.png", class = "app-logo", alt = "IEA logo"),
   div(class = "app-title", div(class = "app-title-main", "Item Bank Explorer")),
-  tags$button(id="iea_theme_toggle",type="button",class="iea-theme-toggle", `aria-label`="Switch theme", "☾ Dark")
+  div(class="iea-theme-switch",role="group",`aria-label`="Appearance",
+    tags$button(id="iea_theme_light",type="button",class="iea-theme-choice",title="Light mode",`aria-label`="Light mode",icon("sun")),
+    tags$button(id="iea_theme_dark",type="button",class="iea-theme-choice",title="Dark mode",`aria-label`="Dark mode",icon("moon")))
 )
 
 app_footer <- div(
@@ -683,18 +685,19 @@ main_ui <- function() page_navbar(
       function ieaSetTheme(dark) {
         document.documentElement.classList.toggle('iea-dark', dark);
         document.documentElement.setAttribute('data-bs-theme', dark ? 'dark' : 'light');
-        var btn = document.getElementById('iea_theme_toggle');
-        if (btn) {
-          btn.textContent = dark ? '☀ Light' : '☾ Dark';
-          btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
-          btn.setAttribute('aria-pressed', String(dark));
-        }
+        ['light', 'dark'].forEach(function(mode) {
+          var btn = document.getElementById('iea_theme_' + mode);
+          if (!btn) return;
+          var selected = (mode === 'dark') === dark;
+          btn.classList.toggle('is-active', selected);
+          btn.setAttribute('aria-pressed', String(selected));
+        });
       }
       var ieaDarkInitial = false;
       try { ieaDarkInitial = localStorage.getItem('ieabank-theme') === 'dark'; } catch(e) {}
       ieaSetTheme(ieaDarkInitial);
-      $(document).on('click', '#iea_theme_toggle', function() {
-        var dark = !document.documentElement.classList.contains('iea-dark');
+      $(document).on('click', '#iea_theme_light, #iea_theme_dark', function() {
+        var dark = this.id === 'iea_theme_dark';
         ieaSetTheme(dark);
         try { localStorage.setItem('ieabank-theme', dark ? 'dark' : 'light'); } catch(e) {}
       });
@@ -715,6 +718,14 @@ main_ui <- function() page_navbar(
 
   tags$style(HTML("\n.iea-home {max-width:1260px;margin:auto;padding:24px 0 34px;color:#55585a;}\n.iea-home-intro {border-left:4px solid #d91a15;padding:8px 0 10px 19px;margin-bottom:27px;}\n.iea-home-intro h1 {font-size:clamp(1.55rem,2.5vw,2.3rem);font-weight:750;margin:0 0 10px;}\n.iea-home-intro p {color:#55585a;margin:0;}\n.iea-home-label {font-size:.85rem;letter-spacing:.09em;color:#55585a;font-weight:700;margin-bottom:14px;}\n.iea-home-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}\n.iea-home-link.btn {min-height:145px;white-space:normal;text-align:left;background:white;color:#55585a;border:1px solid #dfe4e8;border-radius:15px;padding:19px;display:flex;flex-direction:column;align-items:flex-start;gap:9px;box-shadow:0 2px 8px #00000009;}\n.iea-home-link.btn:hover,.iea-home-link.btn:focus {border-color:#0071b9;box-shadow:0 6px 18px #0071b91f;background:#fff;color:#55585a;}\n.iea-home-link i {color:#0071b9;font-size:1.35rem;}\n.iea-home-link strong {font-size:1.12rem;}\n.iea-home-link span {font-size:.88rem;line-height:1.45;}\n.iea-home-note,.iea-home-tile,.iea-home-feedback,.iea-home-legal {border:1px solid #dfe4e8;border-radius:15px;padding:19px;margin-bottom:14px;background:white;}\n.iea-home-note {background:#f6f7f8;}\n.iea-home-tile a {color:#0071b9;font-weight:650;}\n.iea-home-feedback {margin-top:18px;display:flex;justify-content:space-between;align-items:center;gap:24px;}\n.iea-home-feedback .btn {background:#0071b9;border-color:#0071b9;flex-shrink:0;}\n.iea-home-legal {background:#f6f7f8;}\n.iea-home-legal h5,.iea-home-feedback h5 {font-size:1.08rem;}\n.iea-doc-page {max-width:1120px;margin:28px auto;padding:24px 34px;background:white;border:1px solid #e4e8eb;border-radius:14px;}\n.iea-doc-page table {width:100%;margin:15px 0;border-collapse:collapse;}\n.iea-doc-page th,.iea-doc-page td {border-bottom:1px solid #e0e4e7;padding:9px 12px;text-align:left;}\n.iea-doc-page a {color:#0071b9;}\n@media(max-width:900px){.iea-home-grid{grid-template-columns:1fr}.iea-home-feedback{display:block}.iea-home-feedback .btn{margin-top:8px}}
 
+.iea-theme-switch{position:fixed;right:20px;top:17px;z-index:1040;display:flex;gap:3px;padding:4px;background:#edf1f5;border:1px solid #d4dce5;border-radius:999px}
+.iea-theme-choice{display:flex;align-items:center;justify-content:center;width:33px;height:31px;background:transparent;border:0;border-radius:999px;color:#596775;cursor:pointer}
+.iea-theme-choice.is-active{background:#fff;color:#0071b9;box-shadow:0 1px 4px #00000021}
+.iea-theme-choice:focus-visible{outline:2px solid #0071b9;outline-offset:2px}
+html.iea-dark .iea-theme-switch{background:#344353;border-color:#526273}
+html.iea-dark .iea-theme-choice{color:#d1deea}
+html.iea-dark .iea-theme-choice.is-active{background:#202a35;color:#fdda6b}
+@media(max-width:991px){.iea-theme-switch{right:70px;top:14px}}
 .iea-theme-toggle{position:fixed;right:20px;top:19px;z-index:1040;border:1px solid #c8d0d8;border-radius:20px;background:#fff;color:#273343;padding:7px 12px;font-weight:700;cursor:pointer}
 @media(max-width:991px){.iea-theme-toggle{right:70px;top:15px}}
 html.iea-dark{color-scheme:dark;--iea-bg:#151b23;--iea-border:#394450;--iea-text:#e6edf4;--iea-muted:#adbcc9;--iea-blue:#70bfff}
