@@ -1,0 +1,30 @@
+name: IEABank Keep Alive
+
+on:
+  schedule:
+    - cron: "17 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Visit public IEABank Shiny application
+        run: |
+          curl --fail --location --silent --show-error --retry 3 --max-time 90 \
+            --output /dev/null \
+            "https://019ef50e-ba06-9cd3-d2ef-a503e63764d9.share.connect.posit.cloud/"
+
+      - name: Query Supabase Data API (read-only)
+        env:
+          SUPABASE_PUBLISHABLE_KEY: "sb_publishable_VarHbYpEIhc7lJ07Up-Idg_pPduzoI7"
+        run: |
+          curl --fail --silent --show-error --retry 3 --max-time 30 \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+            -H "Accept: application/json" \
+            "https://ejmtcftpafwhgjbdgajh.supabase.co/rest/v1/topic?select=topic_id&limit=1" \
+            --output /dev/null
